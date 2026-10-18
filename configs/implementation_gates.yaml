@@ -1,0 +1,58 @@
+version: '1.2'
+mode: fail_closed
+note: Design-time gate status; runtime tests have NOT been executed.
+gates:
+  PUBLIC-SEARCH:
+    status: SPEC_TEST_ONLY
+    release_blocker: false
+    proof_required:
+    - anonymous_published_search_test
+    - response_projection_contract_test
+  PUBLIC-DETAIL:
+    status: SPEC_TEST_ONLY
+    release_blocker: false
+    proof_required:
+    - anonymous_unpublished_denial_test
+    - response_projection_contract_test
+  PUBLISHED-CHILD:
+    status: BLOCKED
+    release_blocker: true
+    proof_required:
+    - backend_child_event_visibility_test
+    - area_event_membership_test
+    - inactive_phase_visibility_test
+  PRIVATE-SELF-AUTH:
+    status: BLOCKED
+    release_blocker: true
+    proof_required:
+    - bff_verified_identity_test
+    - cross_account_A_B_test
+    - reject_admin_customer_chat_test
+  SAFE-TICKETS:
+    status: BLOCKED
+    release_blocker: true
+    proof_required:
+    - ticket_response_model_projection_test
+    - qr_and_token_log_redaction_test
+  RAG-APPROVED-CORPUS:
+    status: BLOCKED
+    release_blocker: true
+    proof_required:
+    - approved_source_manifest
+    - product_owner_signoff
+    - time_effective_corpus_test
+  RUNTIME-READONLY:
+    status: BLOCKED
+    release_blocker: true
+    proof_required:
+    - live_tool_executor_allowlist_test
+    - zero_business_write_spy
+    - no_side_effect_get_test
+    - business_db_snapshot_unchanged
+  MODEL-EVAL:
+    status: NOT_RUN
+    release_blocker: false
+    proof_required:
+    - base_model_eval
+    - reproducible_dataset_split
+    - signed_evaluation_manifest
