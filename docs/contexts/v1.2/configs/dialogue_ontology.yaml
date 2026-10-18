@@ -1,0 +1,173 @@
+version: '1.2'
+language: vi
+intents:
+  general:
+  - GREETING
+  - OUT_OF_SCOPE
+  - CLARIFY
+  event:
+  - SEARCH_EVENT
+  - EVENT_DETAIL
+  - EVENT_COMPARE
+  ticket:
+  - TICKET_PRICE
+  - TICKET_AVAILABILITY
+  - SEAT_AVAILABILITY
+  - TICKET_RECOMMEND
+  - TICKET_ALTERNATIVE
+  booking:
+  - BOOKING_GUIDANCE
+  - RESERVATION_STATUS
+  - CHECKOUT_HANDOFF
+  account:
+  - ORDER_STATUS
+  - PAYMENT_STATUS
+  - MY_TICKETS
+  support:
+  - REFUND_POLICY
+  - REFUND_SUPPORT
+  - TICKET_TRANSFER_HELP
+  - HUMAN_HANDOFF
+slots:
+  event_id:
+    type: uuid
+    nullable: true
+  event_name:
+    type: string
+    nullable: true
+  category_id:
+    type: uuid
+    nullable: true
+  category_name:
+    type: string
+    nullable: true
+  city:
+    type: string
+    nullable: true
+  date_start:
+    type: datetime
+    nullable: true
+  date_end:
+    type: datetime
+    nullable: true
+  quantity:
+    type: integer
+    min: 1
+    nullable: true
+  ticket_type_id:
+    type: uuid
+    nullable: true
+  ticket_type_name:
+    type: string
+    nullable: true
+  sale_phase_id:
+    type: uuid
+    nullable: true
+  budget_amount:
+    type: decimal
+    min: 0
+    nullable: true
+  budget_currency:
+    type: enum
+    values:
+    - VND
+    default: VND
+  budget_scope:
+    type: enum
+    values:
+    - TOTAL
+    - PER_TICKET
+    - UNKNOWN
+    default: UNKNOWN
+  seat_preference:
+    type: string
+    nullable: true
+  preferred_area_id:
+    type: uuid
+    nullable: true
+  preferred_row:
+    type: string
+    nullable: true
+  order_id:
+    type: uuid
+    nullable: true
+  order_code:
+    type: string
+    nullable: true
+  selected_candidate_id:
+    type: string
+    nullable: true
+  referenced_result_index:
+    type: integer
+    min: 1
+    nullable: true
+  excluded_preferences:
+    type: string_list
+    nullable: true
+    description: Only phrases/labels; never tool definitions
+  active_intent:
+    type: enum
+    values:
+    - GREETING
+    - OUT_OF_SCOPE
+    - CLARIFY
+    - SEARCH_EVENT
+    - EVENT_DETAIL
+    - EVENT_COMPARE
+    - TICKET_PRICE
+    - TICKET_AVAILABILITY
+    - SEAT_AVAILABILITY
+    - TICKET_RECOMMEND
+    - TICKET_ALTERNATIVE
+    - BOOKING_GUIDANCE
+    - RESERVATION_STATUS
+    - CHECKOUT_HANDOFF
+    - ORDER_STATUS
+    - PAYMENT_STATUS
+    - MY_TICKETS
+    - REFUND_POLICY
+    - REFUND_SUPPORT
+    - TICKET_TRANSFER_HELP
+    - HUMAN_HANDOFF
+    nullable: true
+state_delta_operations:
+- SET
+- REMOVE
+- ADD
+- CLEAR
+- REFER
+- SWITCH_TASK
+model_output_policy:
+  business_data_read_only: true
+  state_delta_target: AI_CONVERSATION_ONLY
+  proposed_action_restricted_to_read_or_navigation: true
+proposed_actions:
+- ANSWER_GREETING
+- ASK_CLARIFICATION
+- SEARCH_EVENTS
+- GET_EVENT_DETAILS
+- GET_TICKET_OPTIONS
+- CHECK_INVENTORY
+- CHECK_SEATS
+- RUN_TICKET_OPTIMIZER
+- RETRIEVE_POLICY
+- REQUEST_LOGIN
+- GET_MY_ORDERS
+- GET_PAYMENT_STATUS
+- GET_MY_TICKETS
+- GET_RESERVATION
+- GET_REFUND_REVIEW
+- NAVIGATE_TO_BOOKING
+- SHOW_SUPPORT_CHANNEL
+- EXPLAIN_WRITE_LIMITATION
+- REFUSE_UNSUPPORTED_ACTION
+canonical_state_format: FLAT_SLOT_MAP
+slot_representation: Use budget_amount/budget_currency/budget_scope; budget nested
+  only display DTO not training or state delta
+state_delta_contract:
+  SET: slot in ontology and typed value
+  REMOVE: slot in ontology; no value
+  ADD: slot == excluded_preferences and string value
+  CLEAR: slot in EVENT_FILTERS|TICKET_PREFERENCES|ALL_SLOTS; no value
+  REFER: slot == selected_candidate_id; nonempty id
+  SWITCH_TASK: slot == active_intent; value is known intent

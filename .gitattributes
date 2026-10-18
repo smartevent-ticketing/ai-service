@@ -1,0 +1,6 @@
+* text=auto eol=lf
+# Historical evidence is byte-authoritative, including original line endings.
+docs/contexts/v1.2/** -text
+*.png binary
+*.pdf binary
+*.docx binary

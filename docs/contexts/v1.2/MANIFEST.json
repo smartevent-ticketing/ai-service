@@ -1,0 +1,20 @@
+{
+  "pack_version": "1.2",
+  "date": "2026-10-18",
+  "decision": "AI_BUSINESS_ACCESS_READ_ONLY",
+  "status": "DESIGN_REFERENCE_TESTED_RUNTIME_SECURITY_GATES_BLOCKED",
+  "canonical": [
+    "AGENTS.md",
+    "docs/ai-agent/13_READ_ONLY_BOUNDARY_AND_MIGRATION.md",
+    "docs/ai-agent/14_TOOL_RUNTIME_CONTRACT_AND_SECURITY_GATES.md",
+    "configs/implementation_gates.yaml",
+    "configs/assistant_policy.yaml",
+    "configs/tool_registry.yaml"
+  ],
+  "important_notes": [
+    "Tool Executor GET-only",
+    "Runtime AI cannot mutate business data",
+    "Coding Agent can edit source code under task approval",
+    "Prior v1.0 write-capability statements superseded"
+  ]
+}

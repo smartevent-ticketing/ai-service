@@ -1,0 +1,1606 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://smartevent.example/schemas/training_sample_read_only_v1_2.schema.json",
+  "title": "SmartEventReadOnlyTrainingSample",
+  "description": "Flat slot state. Structured intent+slot+delta+read-only proposal. No business write permitted.",
+  "type": "object",
+  "required": [
+    "sample_id",
+    "dataset_contract",
+    "dataset_version",
+    "language",
+    "task",
+    "previous_state",
+    "user_message",
+    "expected",
+    "metadata"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "sample_id": {
+      "type": "string",
+      "pattern": "^SE-[A-Z0-9-]{3,80}$"
+    },
+    "dataset_contract": {
+      "const": "1.2"
+    },
+    "dataset_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "language": {
+      "const": "vi"
+    },
+    "task": {
+      "enum": [
+        "intent_slot",
+        "dialogue_state_update",
+        "action_selection",
+        "safety"
+      ]
+    },
+    "previous_state": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "event_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "event_name": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "category_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "category_name": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "city": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "date_start": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "date_end": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "quantity": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ticket_type_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ticket_type_name": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sale_phase_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "budget_amount": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "budget_currency": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "VND"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "budget_scope": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "TOTAL",
+                    "PER_TICKET",
+                    "UNKNOWN"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "seat_preference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "preferred_area_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "preferred_row": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "order_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "order_code": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "selected_candidate_id": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "referenced_result_index": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "excluded_preferences": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "maxItems": 20,
+                  "uniqueItems": true
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "active_intent": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "GREETING",
+                    "OUT_OF_SCOPE",
+                    "CLARIFY",
+                    "SEARCH_EVENT",
+                    "EVENT_DETAIL",
+                    "EVENT_COMPARE",
+                    "TICKET_PRICE",
+                    "TICKET_AVAILABILITY",
+                    "SEAT_AVAILABILITY",
+                    "TICKET_RECOMMEND",
+                    "TICKET_ALTERNATIVE",
+                    "BOOKING_GUIDANCE",
+                    "RESERVATION_STATUS",
+                    "CHECKOUT_HANDOFF",
+                    "ORDER_STATUS",
+                    "PAYMENT_STATUS",
+                    "MY_TICKETS",
+                    "REFUND_POLICY",
+                    "REFUND_SUPPORT",
+                    "TICKET_TRANSFER_HELP",
+                    "HUMAN_HANDOFF"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "user_message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4000
+    },
+    "expected": {
+      "type": "object",
+      "properties": {
+        "primary_intent": {
+          "enum": [
+            "GREETING",
+            "OUT_OF_SCOPE",
+            "CLARIFY",
+            "SEARCH_EVENT",
+            "EVENT_DETAIL",
+            "EVENT_COMPARE",
+            "TICKET_PRICE",
+            "TICKET_AVAILABILITY",
+            "SEAT_AVAILABILITY",
+            "TICKET_RECOMMEND",
+            "TICKET_ALTERNATIVE",
+            "BOOKING_GUIDANCE",
+            "RESERVATION_STATUS",
+            "CHECKOUT_HANDOFF",
+            "ORDER_STATUS",
+            "PAYMENT_STATUS",
+            "MY_TICKETS",
+            "REFUND_POLICY",
+            "REFUND_SUPPORT",
+            "TICKET_TRANSFER_HELP",
+            "HUMAN_HANDOFF"
+          ]
+        },
+        "secondary_intents": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "GREETING",
+              "OUT_OF_SCOPE",
+              "CLARIFY",
+              "SEARCH_EVENT",
+              "EVENT_DETAIL",
+              "EVENT_COMPARE",
+              "TICKET_PRICE",
+              "TICKET_AVAILABILITY",
+              "SEAT_AVAILABILITY",
+              "TICKET_RECOMMEND",
+              "TICKET_ALTERNATIVE",
+              "BOOKING_GUIDANCE",
+              "RESERVATION_STATUS",
+              "CHECKOUT_HANDOFF",
+              "ORDER_STATUS",
+              "PAYMENT_STATUS",
+              "MY_TICKETS",
+              "REFUND_POLICY",
+              "REFUND_SUPPORT",
+              "TICKET_TRANSFER_HELP",
+              "HUMAN_HANDOFF"
+            ]
+          },
+          "uniqueItems": true,
+          "maxItems": 6
+        },
+        "entities": {
+          "type": "object",
+          "properties": {
+            "event_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "event_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "category_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "category_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "city": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "date_start": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "date_end": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "quantity": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "ticket_type_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "ticket_type_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "sale_phase_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "budget_amount": {
+              "type": "number",
+              "minimum": 0
+            },
+            "budget_currency": {
+              "type": "string",
+              "enum": [
+                "VND"
+              ]
+            },
+            "budget_scope": {
+              "type": "string",
+              "enum": [
+                "TOTAL",
+                "PER_TICKET",
+                "UNKNOWN"
+              ]
+            },
+            "seat_preference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "preferred_area_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "preferred_row": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "order_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "order_code": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "selected_candidate_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "referenced_result_index": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "excluded_preferences": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "maxItems": 20,
+              "uniqueItems": true
+            },
+            "active_intent": {
+              "type": "string",
+              "enum": [
+                "GREETING",
+                "OUT_OF_SCOPE",
+                "CLARIFY",
+                "SEARCH_EVENT",
+                "EVENT_DETAIL",
+                "EVENT_COMPARE",
+                "TICKET_PRICE",
+                "TICKET_AVAILABILITY",
+                "SEAT_AVAILABILITY",
+                "TICKET_RECOMMEND",
+                "TICKET_ALTERNATIVE",
+                "BOOKING_GUIDANCE",
+                "RESERVATION_STATUS",
+                "CHECKOUT_HANDOFF",
+                "ORDER_STATUS",
+                "PAYMENT_STATUS",
+                "MY_TICKETS",
+                "REFUND_POLICY",
+                "REFUND_SUPPORT",
+                "TICKET_TRANSFER_HELP",
+                "HUMAN_HANDOFF"
+              ]
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "state_delta": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "event_id"
+                  },
+                  "value": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "event_id"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "event_name"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "event_name"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "category_id"
+                  },
+                  "value": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "category_id"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "category_name"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "category_name"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "city"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "city"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "date_start"
+                  },
+                  "value": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "date_start"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "date_end"
+                  },
+                  "value": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "date_end"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "quantity"
+                  },
+                  "value": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "quantity"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "ticket_type_id"
+                  },
+                  "value": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "ticket_type_id"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "ticket_type_name"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "ticket_type_name"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "sale_phase_id"
+                  },
+                  "value": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "sale_phase_id"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "budget_amount"
+                  },
+                  "value": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "budget_amount"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "budget_currency"
+                  },
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "VND"
+                    ]
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "budget_currency"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "budget_scope"
+                  },
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "TOTAL",
+                      "PER_TICKET",
+                      "UNKNOWN"
+                    ]
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "budget_scope"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "seat_preference"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "seat_preference"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "preferred_area_id"
+                  },
+                  "value": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "preferred_area_id"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "preferred_row"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "preferred_row"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "order_id"
+                  },
+                  "value": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "order_id"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "order_code"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "order_code"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "selected_candidate_id"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "selected_candidate_id"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "referenced_result_index"
+                  },
+                  "value": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "referenced_result_index"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SET"
+                  },
+                  "slot": {
+                    "const": "excluded_preferences"
+                  },
+                  "value": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "maxItems": 20,
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REMOVE"
+                  },
+                  "slot": {
+                    "const": "excluded_preferences"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "ADD"
+                  },
+                  "slot": {
+                    "const": "excluded_preferences"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "CLEAR"
+                  },
+                  "slot": {
+                    "const": "ALL_SLOTS"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "CLEAR"
+                  },
+                  "slot": {
+                    "const": "EVENT_FILTERS"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "CLEAR"
+                  },
+                  "slot": {
+                    "const": "TICKET_PREFERENCES"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "REFER"
+                  },
+                  "slot": {
+                    "const": "selected_candidate_id"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "operation": {
+                    "const": "SWITCH_TASK"
+                  },
+                  "slot": {
+                    "const": "active_intent"
+                  },
+                  "value": {
+                    "type": "string",
+                    "enum": [
+                      "GREETING",
+                      "OUT_OF_SCOPE",
+                      "CLARIFY",
+                      "SEARCH_EVENT",
+                      "EVENT_DETAIL",
+                      "EVENT_COMPARE",
+                      "TICKET_PRICE",
+                      "TICKET_AVAILABILITY",
+                      "SEAT_AVAILABILITY",
+                      "TICKET_RECOMMEND",
+                      "TICKET_ALTERNATIVE",
+                      "BOOKING_GUIDANCE",
+                      "RESERVATION_STATUS",
+                      "CHECKOUT_HANDOFF",
+                      "ORDER_STATUS",
+                      "PAYMENT_STATUS",
+                      "MY_TICKETS",
+                      "REFUND_POLICY",
+                      "REFUND_SUPPORT",
+                      "TICKET_TRANSFER_HELP",
+                      "HUMAN_HANDOFF"
+                    ]
+                  }
+                },
+                "required": [
+                  "operation",
+                  "slot",
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "maxItems": 20
+        },
+        "proposed_action": {
+          "enum": [
+            "ANSWER_GREETING",
+            "ASK_CLARIFICATION",
+            "SEARCH_EVENTS",
+            "GET_EVENT_DETAILS",
+            "GET_TICKET_OPTIONS",
+            "CHECK_INVENTORY",
+            "CHECK_SEATS",
+            "RUN_TICKET_OPTIMIZER",
+            "RETRIEVE_POLICY",
+            "REQUEST_LOGIN",
+            "GET_MY_ORDERS",
+            "GET_PAYMENT_STATUS",
+            "GET_MY_TICKETS",
+            "GET_RESERVATION",
+            "GET_REFUND_REVIEW",
+            "NAVIGATE_TO_BOOKING",
+            "SHOW_SUPPORT_CHANNEL",
+            "EXPLAIN_WRITE_LIMITATION",
+            "REFUSE_UNSUPPORTED_ACTION"
+          ]
+        }
+      },
+      "required": [
+        "primary_intent",
+        "state_delta",
+        "proposed_action"
+      ],
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "enum": [
+            "human_written",
+            "synthetic_reviewed",
+            "production_anonymized_reviewed"
+          ]
+        },
+        "scenario": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "difficulty": {
+          "enum": [
+            "easy",
+            "medium",
+            "hard"
+          ]
+        },
+        "dialogue_group": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 90
+        },
+        "scenario_family": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 90
+        }
+      },
+      "required": [
+        "source",
+        "scenario",
+        "dialogue_group",
+        "scenario_family"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://smartevent.example/schemas/rag_corpus_manifest_v1_2.schema.json",
+  "title": "SmartEventRAGCorpusDocumentManifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_id", "canonical_uri", "owner_role", "reviewer_role", "status", "version", "audience", "locale", "content_sha256", "last_reviewed_at"],
+  "properties": {
+    "source_id": {"type":"string","minLength":3,"maxLength":100},
+    "canonical_uri": {"type":"string","minLength":6,"maxLength":1024},
+    "owner_role": {"type":"string","minLength":3},
+    "reviewer_role": {"type":"string","minLength":3},
+    "status": {"enum": ["draft", "approved", "revoked", "superseded"]},
+    "version": {"type":"string","minLength":1},
+    "approved_at": {"type":["string","null"],"format":"date-time"},
+    "effective_from": {"type":["string","null"],"format":"date-time"},
+    "effective_until": {"type":["string","null"],"format":"date-time"},
+    "audience": {"enum":["customer_public","customer_authenticated","staff_internal"]},
+    "locale": {"const":"vi-VN"},
+    "content_sha256": {"type":"string","pattern":"^[a-fA-F0-9]{64}$"},
+    "last_reviewed_at": {"type":"string","format":"date-time"},
+    "review_due_at": {"type":["string","null"],"format":"date-time"}
+  }
+}

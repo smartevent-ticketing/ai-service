@@ -1,0 +1,1208 @@
+version: '1.2'
+business_access: READ_ONLY
+enforcement:
+  default: deny
+  allowed_methods:
+  - GET
+  deny_mutations: true
+  deny_unknown_tools: true
+  deny_side_effect_get: true
+  deny_redirects: true
+  no_arbitrary_hosts_or_urls: true
+  deny_encoded_path_variants: true
+  max_response_bytes: 262144
+  response_projection_mode: allowlist_only
+  deny_raw_responses_in_model_context: true
+  deny_request_retries_by_default: true
+  private_tools_fail_closed_until_auth_proven: true
+tools:
+- name: search_events
+  access: public
+  method: GET
+  endpoint: /api/v1/events
+  mutation: false
+  enabled: true
+  requires_visibility_audit: false
+  requires_authenticated_user: false
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: page
+    projection: ALLOWLIST
+    fields:
+    - id
+    - name
+    - slug
+    - venueName
+    - city
+    - startTime
+    - endTime
+    - status
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+    only_items_matching:
+      status: PUBLISHED
+  arguments_schema:
+    type: object
+    properties:
+      q:
+        type: string
+        maxLength: 120
+      city:
+        type: string
+        maxLength: 80
+      categoryId: &id001
+        type: string
+        format: uuid
+      page:
+        type: integer
+        minimum: 0
+        maximum: 9
+      size:
+        type: integer
+        minimum: 1
+        maximum: 20
+    required: []
+    additionalProperties: false
+  principal_scope: PUBLIC_ANONYMOUS
+  credential_policy: NO_AUTHORIZATION_HEADER
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 20
+  requires_backend_visibility_guard: false
+  visibility_policy: MUST_BE_PUBLISHED
+  requires_runtime_gate: false
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+      venueName:
+        type: string
+      city:
+        type: string
+      startTime:
+        type: string
+      endTime:
+        type: string
+      status:
+        type: string
+    additionalProperties: false
+  disabled_reason: null
+- name: get_event_details
+  access: public
+  method: GET
+  endpoint: /api/v1/events/{id}
+  mutation: false
+  enabled: true
+  requires_visibility_audit: false
+  requires_authenticated_user: false
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: object
+    projection: ALLOWLIST
+    fields:
+    - id
+    - name
+    - slug
+    - description
+    - city
+    - startTime
+    - endTime
+    - status
+    - maxTicketsPerUser
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+    only_if:
+      status: PUBLISHED
+  arguments_schema:
+    type: object
+    properties:
+      id: *id001
+    required:
+    - id
+    additionalProperties: false
+  principal_scope: PUBLIC_ANONYMOUS
+  credential_policy: NO_AUTHORIZATION_HEADER
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 100
+  requires_backend_visibility_guard: false
+  visibility_policy: MUST_BE_PUBLISHED
+  requires_runtime_gate: false
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      slug:
+        type: string
+      description:
+        type: string
+      city:
+        type: string
+      startTime:
+        type: string
+      endTime:
+        type: string
+      status:
+        type: string
+      maxTicketsPerUser:
+        type: integer
+    additionalProperties: false
+  disabled_reason: null
+- name: get_event_areas
+  access: public
+  method: GET
+  endpoint: /api/v1/events/{eventId}/areas
+  mutation: false
+  enabled: false
+  requires_visibility_audit: true
+  requires_authenticated_user: false
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: list
+    projection: ALLOWLIST
+    fields:
+    - id
+    - eventId
+    - name
+    - areaType
+    - capacity
+    - totalSeatsConfigured
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+  arguments_schema:
+    type: object
+    properties:
+      eventId: *id001
+    required:
+    - eventId
+    additionalProperties: false
+  principal_scope: PUBLIC_ANONYMOUS
+  credential_policy: NO_AUTHORIZATION_HEADER
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 100
+  requires_backend_visibility_guard: true
+  visibility_policy: MUST_BE_PUBLISHED
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      eventId:
+        type: string
+      name:
+        type: string
+      areaType:
+        type: string
+      capacity:
+        type: integer
+      totalSeatsConfigured:
+        type: integer
+    additionalProperties: false
+  disabled_reason: 'Gate PUBLISHED-CHILD: backend event visibility guard + unpublished tests required'
+- name: get_ticket_types
+  access: public
+  method: GET
+  endpoint: /api/v1/events/{eventId}/ticket-types
+  mutation: false
+  enabled: false
+  requires_visibility_audit: true
+  requires_authenticated_user: false
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: list
+    projection: ALLOWLIST
+    fields:
+    - id
+    - eventId
+    - eventAreaId
+    - areaName
+    - areaType
+    - name
+    - description
+    - status
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+  arguments_schema:
+    type: object
+    properties:
+      eventId: *id001
+    required:
+    - eventId
+    additionalProperties: false
+  principal_scope: PUBLIC_ANONYMOUS
+  credential_policy: NO_AUTHORIZATION_HEADER
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 100
+  requires_backend_visibility_guard: true
+  visibility_policy: MUST_BE_PUBLISHED
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      eventId:
+        type: string
+      eventAreaId:
+        type: string
+      areaName:
+        type: string
+      areaType:
+        type: string
+      name:
+        type: string
+      description:
+        type: string
+      status:
+        type: string
+    additionalProperties: false
+  disabled_reason: 'Gate PUBLISHED-CHILD: backend event visibility guard + unpublished tests required'
+- name: get_sale_phases
+  access: public
+  method: GET
+  endpoint: /api/v1/events/{eventId}/sale-phases
+  mutation: false
+  enabled: false
+  requires_visibility_audit: true
+  requires_authenticated_user: false
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: list
+    projection: ALLOWLIST
+    fields:
+    - id
+    - ticketTypeId
+    - ticketTypeName
+    - name
+    - price
+    - quantity
+    - saleStartAt
+    - saleEndAt
+    - maxPerOrder
+    - maxPerUser
+    - status
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+  arguments_schema:
+    type: object
+    properties:
+      eventId: *id001
+    required:
+    - eventId
+    additionalProperties: false
+  principal_scope: PUBLIC_ANONYMOUS
+  credential_policy: NO_AUTHORIZATION_HEADER
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 100
+  requires_backend_visibility_guard: true
+  visibility_policy: MUST_BE_PUBLISHED
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      ticketTypeId:
+        type: string
+      ticketTypeName:
+        type: string
+      name:
+        type: string
+      price:
+        type: number
+      quantity:
+        type: integer
+      saleStartAt:
+        type: string
+      saleEndAt:
+        type: string
+      maxPerOrder:
+        type: integer
+      maxPerUser:
+        type: integer
+      status:
+        type: string
+    additionalProperties: false
+  disabled_reason: 'Gate PUBLISHED-CHILD: backend event visibility guard + unpublished tests required'
+- name: get_event_inventory
+  access: public
+  method: GET
+  endpoint: /api/v1/events/{eventId}/inventory
+  mutation: false
+  enabled: false
+  requires_visibility_audit: true
+  requires_authenticated_user: false
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: list
+    projection: ALLOWLIST
+    fields:
+    - eventId
+    - eventAreaId
+    - ticketTypeId
+    - salePhaseId
+    - totalQuantity
+    - heldQuantity
+    - soldQuantity
+    - availableQuantity
+    - updatedAt
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+  arguments_schema:
+    type: object
+    properties:
+      eventId: *id001
+    required:
+    - eventId
+    additionalProperties: false
+  principal_scope: PUBLIC_ANONYMOUS
+  credential_policy: NO_AUTHORIZATION_HEADER
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 100
+  requires_backend_visibility_guard: true
+  visibility_policy: MUST_BE_PUBLISHED
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      eventId:
+        type: string
+      eventAreaId:
+        type: string
+      ticketTypeId:
+        type: string
+      salePhaseId:
+        type: string
+      totalQuantity:
+        type: integer
+      heldQuantity:
+        type: integer
+      soldQuantity:
+        type: integer
+      availableQuantity:
+        type: integer
+      updatedAt:
+        type: string
+    additionalProperties: false
+  disabled_reason: 'Gate PUBLISHED-CHILD: backend event visibility guard + unpublished tests required'
+- name: get_available_seats
+  access: public
+  method: GET
+  endpoint: /api/v1/areas/{areaId}/seats/available
+  mutation: false
+  enabled: false
+  requires_visibility_audit: true
+  requires_authenticated_user: false
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: list
+    projection: ALLOWLIST
+    fields:
+    - id
+    - eventAreaId
+    - rowName
+    - seatNumber
+    - label
+    - status
+    - holdExpiresAt
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+    only_items_matching:
+      status: AVAILABLE
+    caveat: Despite path name, backend currently returns all seat statuses; only AVAILABLE may be recommended.
+  arguments_schema:
+    type: object
+    properties:
+      areaId: *id001
+    required:
+    - areaId
+    additionalProperties: false
+  principal_scope: PUBLIC_ANONYMOUS
+  credential_policy: NO_AUTHORIZATION_HEADER
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 500
+  requires_backend_visibility_guard: true
+  visibility_policy: MUST_BE_PUBLISHED
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      eventAreaId:
+        type: string
+      rowName:
+        type: string
+      seatNumber:
+        type: string
+      label:
+        type: string
+      status:
+        type: string
+      holdExpiresAt:
+        type: string
+    additionalProperties: false
+  disabled_reason: 'Gate PUBLISHED-CHILD: backend event visibility guard + unpublished tests required'
+- name: get_active_reservation
+  access: authenticated
+  method: GET
+  endpoint: /api/v1/reservations/active
+  mutation: false
+  enabled: false
+  requires_visibility_audit: false
+  requires_authenticated_user: true
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: object
+    projection: ALLOWLIST
+    fields:
+    - id
+    - eventId
+    - eventName
+    - status
+    - expiresAt
+    - totalAmount
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+  arguments_schema:
+    type: object
+    properties:
+      eventId: *id001
+    required:
+    - eventId
+    additionalProperties: false
+  principal_scope: CUSTOMER_SELF_ONLY
+  credential_policy: VERIFIED_CUSTOMER_DELEGATION_NO_ADMIN
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 100
+  requires_backend_visibility_guard: false
+  visibility_policy: CUSTOMER_SELF_ONLY
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      eventId:
+        type: string
+      eventName:
+        type: string
+      status:
+        type: string
+      expiresAt:
+        type: string
+      totalAmount:
+        type: number
+    additionalProperties: false
+  disabled_reason: 'Gate PRIVATE-SELF-AUTH: verified customer-only identity propagation and cross-account tests required'
+- name: get_reservation
+  access: authenticated
+  method: GET
+  endpoint: /api/v1/reservations/{id}
+  mutation: false
+  enabled: false
+  requires_visibility_audit: false
+  requires_authenticated_user: true
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: object
+    projection: ALLOWLIST
+    fields:
+    - id
+    - eventId
+    - eventName
+    - status
+    - expiresAt
+    - totalAmount
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+  arguments_schema:
+    type: object
+    properties:
+      id: *id001
+    required:
+    - id
+    additionalProperties: false
+  principal_scope: CUSTOMER_SELF_ONLY
+  credential_policy: VERIFIED_CUSTOMER_DELEGATION_NO_ADMIN
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 100
+  requires_backend_visibility_guard: false
+  visibility_policy: CUSTOMER_SELF_ONLY
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      eventId:
+        type: string
+      eventName:
+        type: string
+      status:
+        type: string
+      expiresAt:
+        type: string
+      totalAmount:
+        type: number
+    additionalProperties: false
+  disabled_reason: 'Gate PRIVATE-SELF-AUTH: verified customer-only identity propagation and cross-account tests required'
+- name: get_my_orders
+  access: authenticated
+  method: GET
+  endpoint: /api/v1/orders/my-orders
+  mutation: false
+  enabled: false
+  requires_visibility_audit: false
+  requires_authenticated_user: true
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: page
+    projection: ALLOWLIST
+    fields:
+    - id
+    - orderCode
+    - totalAmount
+    - currency
+    - status
+    - paymentDeadline
+    - createdAt
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+  arguments_schema:
+    type: object
+    properties:
+      page:
+        type: integer
+        minimum: 0
+        maximum: 9
+      size:
+        type: integer
+        minimum: 1
+        maximum: 10
+    required: []
+    additionalProperties: false
+  principal_scope: CUSTOMER_SELF_ONLY
+  credential_policy: VERIFIED_CUSTOMER_DELEGATION_NO_ADMIN
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 10
+  requires_backend_visibility_guard: false
+  visibility_policy: CUSTOMER_SELF_ONLY
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      orderCode:
+        type: string
+      totalAmount:
+        type: number
+      currency:
+        type: string
+      status:
+        type: string
+      paymentDeadline:
+        type: string
+      createdAt:
+        type: string
+    additionalProperties: false
+  disabled_reason: 'Gate PRIVATE-SELF-AUTH: verified customer-only identity propagation and cross-account tests required'
+- name: get_order
+  access: authenticated
+  method: GET
+  endpoint: /api/v1/orders/{id}
+  mutation: false
+  enabled: false
+  requires_visibility_audit: false
+  requires_authenticated_user: true
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: object
+    projection: ALLOWLIST
+    fields:
+    - id
+    - orderCode
+    - totalAmount
+    - currency
+    - status
+    - paymentDeadline
+    - createdAt
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+  arguments_schema:
+    type: object
+    properties:
+      id: *id001
+    required:
+    - id
+    additionalProperties: false
+  principal_scope: CUSTOMER_SELF_ONLY
+  credential_policy: VERIFIED_CUSTOMER_DELEGATION_NO_ADMIN
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 100
+  requires_backend_visibility_guard: false
+  visibility_policy: CUSTOMER_SELF_ONLY
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      orderCode:
+        type: string
+      totalAmount:
+        type: number
+      currency:
+        type: string
+      status:
+        type: string
+      paymentDeadline:
+        type: string
+      createdAt:
+        type: string
+    additionalProperties: false
+  disabled_reason: 'Gate PRIVATE-SELF-AUTH: verified customer-only identity propagation and cross-account tests required'
+- name: get_payment_status
+  access: authenticated
+  method: GET
+  endpoint: /api/v1/payments/{id}
+  mutation: false
+  enabled: false
+  requires_visibility_audit: false
+  requires_authenticated_user: true
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: object
+    projection: ALLOWLIST
+    fields:
+    - paymentId
+    - orderId
+    - orderCode
+    - amount
+    - paymentMethod
+    - status
+    - createdAt
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+  arguments_schema:
+    type: object
+    properties:
+      id: *id001
+    required:
+    - id
+    additionalProperties: false
+  principal_scope: CUSTOMER_SELF_ONLY
+  credential_policy: VERIFIED_CUSTOMER_DELEGATION_NO_ADMIN
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 100
+  requires_backend_visibility_guard: false
+  visibility_policy: CUSTOMER_SELF_ONLY
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      paymentId:
+        type: string
+      orderId:
+        type: string
+      orderCode:
+        type: string
+      amount:
+        type: number
+      paymentMethod:
+        type: string
+      status:
+        type: string
+      createdAt:
+        type: string
+    additionalProperties: false
+  disabled_reason: 'Gate PRIVATE-SELF-AUTH: verified customer-only identity propagation and cross-account tests required'
+- name: get_my_tickets
+  access: authenticated
+  method: GET
+  endpoint: /api/v1/tickets/my-tickets
+  mutation: false
+  enabled: false
+  requires_visibility_audit: false
+  requires_authenticated_user: true
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: list
+    projection: ALLOWLIST
+    fields:
+    - id
+    - eventId
+    - eventName
+    - areaName
+    - seatCode
+    - ticketTypeName
+    - salePhaseName
+    - status
+    - issuedAt
+    - usedAt
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+  arguments_schema:
+    type: object
+    properties: {}
+    required: []
+    additionalProperties: false
+  principal_scope: CUSTOMER_SELF_ONLY
+  credential_policy: VERIFIED_CUSTOMER_DELEGATION_NO_ADMIN
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 100
+  requires_backend_visibility_guard: false
+  visibility_policy: CUSTOMER_SELF_ONLY
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      eventId:
+        type: string
+      eventName:
+        type: string
+      areaName:
+        type: string
+      seatCode:
+        type: string
+      ticketTypeName:
+        type: string
+      salePhaseName:
+        type: string
+      status:
+        type: string
+      issuedAt:
+        type: string
+      usedAt:
+        type: string
+    additionalProperties: false
+  disabled_reason: 'Gate PRIVATE-SELF-AUTH: verified customer-only identity propagation and cross-account tests required'
+- name: get_refund_review
+  access: authenticated
+  method: GET
+  endpoint: /api/v1/orders/{orderId}/refund-review
+  mutation: false
+  enabled: false
+  requires_visibility_audit: false
+  requires_authenticated_user: true
+  response:
+    source: spring_boot
+    read_only: true
+    envelope: ApiResponse.data
+    result_shape: object
+    projection: ALLOWLIST
+    fields:
+    - id
+    - orderId
+    - amount
+    - status
+    - createdAt
+    - resolvedAt
+    deny_unlisted_fields: true
+    redact_fields:
+    - qrCodeBase64
+    - qrCode
+    - ticketCode
+    - token
+    - tokenHash
+    - accessToken
+    - refreshToken
+    - paymentUrl
+    - customerNote
+    - reason
+    - evidenceReference
+    - currentOwnerUserId
+    - originalBuyerUserId
+    - userId
+    - organizerId
+    - customerEmail
+    - email
+    - phone
+    - bankCode
+    - resolutionNote
+    content_is_untrusted: true
+  arguments_schema:
+    type: object
+    properties:
+      orderId: *id001
+    required:
+    - orderId
+    additionalProperties: false
+  principal_scope: CUSTOMER_SELF_ONLY
+  credential_policy: VERIFIED_CUSTOMER_DELEGATION_NO_ADMIN
+  timeout_ms: 3000
+  follow_redirects: false
+  retry_policy: NONE
+  max_results: 100
+  requires_backend_visibility_guard: false
+  visibility_policy: CUSTOMER_SELF_ONLY
+  requires_runtime_gate: true
+  response_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      orderId:
+        type: string
+      amount:
+        type: number
+      status:
+        type: string
+      createdAt:
+        type: string
+      resolvedAt:
+        type: string
+    additionalProperties: false
+  disabled_reason: 'Gate PRIVATE-SELF-AUTH: verified customer-only identity propagation and cross-account tests required'
+pure_operations:
+- name: retrieve_policy
+  kind: retrieval
+  side_effect: false
+- name: optimize_ticket_selection
+  kind: computation
+  side_effect: false
+ui_actions:
+- name: NAVIGATE_TO_BOOKING
+  kind: navigation
+  business_tool: false
+- name: SHOW_SUPPORT_CHANNEL
+  kind: navigation
+  business_tool: false
+backend_origin: CONFIGURED_INTERNAL_BACKEND_ONLY
+contract_note: Registry is a design-time specification; disabled tools MUST NOT be executed. Runtime gate evidence still
+  pending.

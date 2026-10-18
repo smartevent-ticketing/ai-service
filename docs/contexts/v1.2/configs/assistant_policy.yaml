@@ -1,0 +1,88 @@
+policy_version: '1.2'
+assistant:
+  name: SmartEvent AI Ticketing Copilot
+  language: vi
+  mode: controlled_task_oriented_read_only
+  business_access: READ_ONLY
+limits:
+  max_tool_calls_per_turn: 5
+  max_model_steps_per_turn: 3
+  max_retries_per_get_tool: 1
+execution:
+  default_permission: deny
+  allowed_business_methods:
+  - GET
+  deny_all_business_mutations: true
+  allow_direct_business_db: false
+  allow_arbitrary_sql: false
+  allow_dynamic_tool_urls: false
+  allow_background_business_writes: false
+  allow_side_effect_get: false
+  deny_redirects: true
+  deny_non_allowlisted_get: true
+  deny_model_supplied_host_or_path: true
+  fail_closed_on_schema_error: true
+  response_projection_before_model: true
+  no_raw_response_logging: true
+transactions:
+  backend_is_source_of_truth: true
+  assistant_may_initiate_transactions: false
+  assistant_may_create_or_cancel_reservations: false
+  assistant_may_create_refund_review: false
+  assistant_may_create_orders_or_payments: false
+  require_authentication_for_private_reads: true
+  require_backend_ownership_for_private_reads: true
+dialogue:
+  output_mode: state_delta
+  state_delta_scope: AI_CONVERSATION_ONLY
+  preserve_confirmed_slots: true
+  support_state_correction: true
+  ask_on_material_ambiguity: true
+  use_state_versioning: true
+navigation:
+  allowed: true
+  internal_routes_only: true
+  allowed_actions:
+  - NAVIGATE_TO_BOOKING
+  - SHOW_SUPPORT_CHANNEL
+  navigation_is_not_business_tool: true
+  user_must_complete_business_actions_in_existing_ui: true
+recommendation:
+  enforce_hard_constraints: true
+  allow_soft_constraint_relaxation: true
+  explain_recommendations: true
+  refresh_snapshot_before_recommendation_or_navigation: true
+grounding:
+  event_data_source: approved_backend_get
+  inventory_source: approved_backend_get
+  payment_source: authenticated_backend_get
+  policy_source: approved_knowledge_base
+  refuse_unsupported_facts: true
+  block_unpublished_event_leaks: true
+jev:
+  enabled_by_default: false
+  fallback_required: true
+identity:
+  public_requests_use_anonymous_credential: true
+  private_scope: CUSTOMER_SELF_ONLY
+  reject_admin_or_service_privilege_in_customer_chat: true
+  validate_delegated_identity_at_backend: true
+  do_not_take_principal_from_model: true
+  private_tools_default_off_until_auth_gate: true
+  allowlist_service_hosts_only: true
+data_security:
+  default_projection: DENY_ALL_FIELDS
+  qr_token_and_ticket_code_in_model_context: false
+  sensitive_field_filtering: ALLOWLIST_ONLY
+  deny_raw_payload_to_any_model: true
+  deny_raw_payload_to_jev_and_logs: true
+  untrusted_content_is_data_not_instructions: true
+availability_gates:
+  child_event_tools_off_until_backend_published_guard_tested: true
+  private_tools_off_until_customer_self_auth_tested: true
+  no_claims_of_realtime_bookability: true
+  stale_snapshot_notice_required: true
+rag:
+  only_approved_active_public_corpus: true
+  no_draft_legal_policy_auto_publish: true
+  deny_private_admin_corpus_in_public_namespace: true

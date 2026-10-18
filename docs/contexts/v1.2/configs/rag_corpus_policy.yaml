@@ -1,0 +1,18 @@
+version: '1.2'
+status: CORPUS_NOT_APPROVED_YET
+publication_gate:
+  must_be_approved: true
+  must_be_effective_at_query_time: true
+  must_be_in_accessible_audience: true
+  must_have_content_sha256: true
+  must_have_canonical_uri: true
+  must_have_owner_and_reviewer: true
+  source_documents_must_be_readonly_for_chatbot: true
+retrieval:
+  default_deny_unknown_status: true
+  allow_statuses: [approved]
+  audience_for_anonymous: [customer_public]
+  audience_for_authenticated_customer: [customer_public, customer_authenticated]
+  staff_internal_never_sent_to_customer: true
+  fail_closed_if_conflicting_versions: true
+  cite_source_id_and_version: true
