@@ -1,6 +1,6 @@
 version: '1.2'
 mode: fail_closed
-note: Design-time gate status; runtime tests have NOT been executed.
+note: Live business and policy-corpus approvals are not implied by unit or TEST_ONLY evidence.
 gates:
   PUBLIC-SEARCH:
     status: SPEC_TEST_ONLY
@@ -56,3 +56,11 @@ gates:
     - base_model_eval
     - reproducible_dataset_split
     - signed_evaluation_manifest
+  RAG-READONLY:
+    status: BLOCKED
+    release_blocker: true
+    proof_required:
+    - reviewed_catalog_and_release_trust_anchors
+    - corpus_revocation_and_expiry_integration_tests
+    - runtime_has_no_index_or_business_write_capability
+    - approved_corpus_retrieval_and_citation_evaluation

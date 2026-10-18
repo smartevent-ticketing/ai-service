@@ -1,0 +1,14 @@
+version: 1
+enabled: false
+gate_id: RAG-APPROVED-CORPUS
+safety_gate_id: RAG-READONLY
+catalog_path: null
+catalog_sha256: null
+release_path: null
+release_sha256: null
+max_catalog_age_seconds: 86400
+max_catalog_bytes: 524288
+max_release_bytes: 16000000
+max_results: 3
+max_answer_chars: 6000
+timeout_ms: 2000
