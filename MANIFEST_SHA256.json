@@ -8,7 +8,7 @@
   "AGENTS.md": "ab7bed49def275ba38dfdf27e45904659d1ee6e8bf1f7d6b3ecd2819fea48354",
   "Dockerfile": "e794a3b14de5186194726195b5a698e88ec485dfecaa22a3af17158503009744",
   "Makefile": "5cf6b3c13ab98ac077d487469bbdefcc89068cbedfa972568e3285bc69707056",
-  "README.md": "79fab20ec638925eaa3bf9b2671362060ec9e5eb4d91bd3dbe76cd18d3732dd9",
+  "README.md": "2b5ad3bb633a579ca6e24074283e0bb3e7dc56ba281d652c48e61e8a7d28fcaf",
   "configs/implementation_gates.yaml": "d124991c73bffebaa88804d79d8422aacd4447f3325e598c4cd526a09e4b5c16",
   "configs/runtime_tool_registry.yaml": "a0a5cda36f5267d9e7d70926b059d8f635dcfdd9cf2ad6235886fb7f458b8d23",
   "datasets/examples/synthetic_vi.jsonl": "26606c563aa30ffa5422cf0ef286111be1901fa3bf3371e106b0038549a6f625",
