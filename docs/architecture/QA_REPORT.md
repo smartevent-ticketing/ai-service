@@ -1,0 +1,58 @@
+# Foundation 0.1.2 — verification evidence
+
+Date: 2026-10-18. Source preparation for GitHub upload is complete within the
+development-foundation scope. This is not a production or merge approval; remote
+CI and container evidence are still absent. All 14 business tools remain disabled.
+
+Verification used Windows with Python 3.11.9 and 3.12.10 and the hashed dependency
+graph in this repository. Full runtime tests ran from a manifest-only source
+export, excluding local reports, credentials, virtual environments and build
+metadata. Maintained documentation was finalized after those code checks; all
+executable/config/test/dependency files were compared with the checked export.
+
+| Gate | Result |
+|---|---|
+| Compile sources/scripts/tests | PASS |
+| Clean Architecture/read-only static guard | PASS |
+| Ruff + formatting | PASS |
+| Mypy | PASS, 27 source files |
+| Runtime tests on Python 3.11.9 | PASS, 150 tests, 92.45% statement coverage |
+| Runtime tests on Python 3.12.10 | PASS, 150 tests, 92.45% statement coverage |
+| Historical reference tests + static validator | PASS, 47 tests; specification evidence only |
+| Historical source integrity | PASS, original 49 SHA-256 values |
+| Runtime configuration synchronization | PASS, root/package copies byte-identical |
+| Lock/export integrity | PASS, universal lock and both hash exports agree |
+| Dependency consistency | PASS, no broken requirements in project environment |
+| Runtime dependency audit | PASS, pip-audit 2.10.1 reports no known vulnerabilities after framework updates |
+| Source manifest/export | PASS, no ignored manifest entries; fresh export verifies without local reports |
+| Wheel build | PASS from clean source using CI's pip wheel command |
+| Isolated wheel smoke | PASS, hashed runtime install in new venv, import from that venv, empty CWD, health/degraded/chat |
+| Docker build/smoke | NOT_RUN: Docker Engine `/version` returns HTTP 500 on this host |
+| Remote Linux/Windows CI | NOT_RUN: no push performed; workflow definition is not passing Actions evidence |
+| Live visibility/auth/zero-write/load/model/RAG | BLOCKED / NOT_IMPLEMENTED; see release gates |
+
+Wheel: `smartevent_ai_service-0.1.2-py3-none-any.whl`, 35349 bytes,
+SHA-256 `0a556664abb5359beba8cc1abfb0f7ae003460eee170ae3aa968fa5788272518`.
+Every packaged Python/YAML file was matched to the current source bytes.
+
+One third-party deprecation warning remains: Starlette TestClient's compatibility
+with httpx. It does not fail tests and is not suppressed. The business HTTP adapter
+still explicitly uses httpx 0.28.1; a future TestClient migration must be tested.
+
+The original dependency audit reported advisories in pydantic-settings and
+Starlette; the pins were upgraded and the audit rerun without ignore exemptions.
+This does not establish exploitability of every advisory in this application or
+guarantee the absence of future advisories. Upstream references:
+[pydantic-settings advisory](https://github.com/pydantic/pydantic-settings/security/advisories/GHSA-4xgf-cpjx-pc3j),
+[Starlette advisory](https://github.com/Kludex/starlette/security/advisories/GHSA-82w8-qh3p-5jfq).
+
+CI defines Python 3.11/3.12 on Windows and Linux, hash-locked installation, lint,
+format/type/static checks, runtime and historical tests, context/config/source
+integrity, dependency audit, wheel build/isolated install and Docker smoke. The
+Docker base tag still floats; locked Python dependencies alone do not make image
+bytes reproducible. A passing remote run and container evidence must precede any
+merge/release claim.
+
+See [REVIEW_LOG.md](REVIEW_LOG.md) for the 12 audit closures and
+[BACKLOG.md](BACKLOG.md) for remaining product/release work. These tests authorize
+no live backend reads and make no claims about trained models or production load.
