@@ -59,6 +59,7 @@ class ClearGroup(StrEnum):
 class Grounding(StrEnum):
     NO_LIVE_DATA = "NO_LIVE_DATA"
     BACKEND_READ = "BACKEND_READ"
+    APPROVED_CORPUS = "APPROVED_CORPUS"
 
 
 def _validate_optional_text(name: str, value: str | None, maximum: int) -> None:

@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 
 from smartevent_ai.application.models import ChatCommand, ChatResult
 from smartevent_ai.application.ports import BusinessReadTools, LanguageUnderstanding
+from smartevent_ai.application.knowledge_ports import PolicyReader
 from smartevent_ai.application.response_composer import ResponseComposer
 from smartevent_ai.domain.dialogue import DialogueState, Grounding, Intent, merge_state
 from smartevent_ai.domain.errors import SmartEventError
@@ -16,10 +17,15 @@ class ChatUseCase:
         nlu: LanguageUnderstanding,
         tools: BusinessReadTools,
         composer: ResponseComposer | None = None,
+        policies: PolicyReader | None = None,
     ) -> None:
         self._nlu = nlu
         self._tools = tools
         self._composer = composer or ResponseComposer()
+        self._policies = policies
+
+    def policy_status(self) -> str:
+        return self._policies.status() if self._policies is not None else "disabled"
 
     async def handle(self, request: ChatCommand) -> ChatResult:
         understood = self._nlu.parse(request.message, request.previous_state)
@@ -37,6 +43,18 @@ class ChatUseCase:
 
         if understood.intent is Intent.SEARCH_EVENT:
             return await self._search_events(conversation_id, understood.intent, state)
+
+        if understood.intent is Intent.REFUND_POLICY and self._policies is not None:
+            evidence = await self._policies.answer(request.message)
+            if evidence.citations:
+                return ChatResult(
+                    conversation_id,
+                    understood.intent,
+                    state,
+                    evidence.answer,
+                    Grounding.APPROVED_CORPUS,
+                    citations=evidence.citations,
+                )
 
         return ChatResult(
             conversation_id=conversation_id,

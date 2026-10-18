@@ -90,6 +90,18 @@ class ChatRequestDTO(BaseModel):
         )
 
 
+class CitationDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source_id: str
+    version: str
+    title: str
+    canonical_uri: str
+    chunk_id: str
+    heading_path: list[str]
+    start: int
+    end: int
+
+
 class ChatResponseDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -99,6 +111,7 @@ class ChatResponseDTO(BaseModel):
     answer: str
     grounding: str
     tool_called: str | None = None
+    citations: list[CitationDTO] = Field(default_factory=list)
 
     @classmethod
     def from_result(cls, result: ChatResult) -> "ChatResponseDTO":
@@ -109,6 +122,19 @@ class ChatResponseDTO(BaseModel):
             answer=result.answer,
             grounding=result.grounding.value,
             tool_called=result.tool_called,
+            citations=[
+                CitationDTO(
+                    source_id=c.source_id,
+                    version=c.version,
+                    title=c.title,
+                    canonical_uri=c.canonical_uri,
+                    chunk_id=c.chunk_id,
+                    heading_path=list(c.heading_path),
+                    start=c.start,
+                    end=c.end,
+                )
+                for c in result.citations
+            ],
         )
 
 
@@ -129,6 +155,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "status": "degraded" if not enabled else "ready",
             "business_tools_enabled": enabled,
             "model_backend": "rule_based_baseline_only",
+            "policy_retrieval": {"status": chat.policy_status(), "answer_mode": "extractive"},
         }
 
     @app.post("/api/v1/chat", response_model=ChatResponseDTO)

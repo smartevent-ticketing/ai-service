@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from smartevent_ai.domain.dialogue import DialogueState, Grounding, Intent
+from smartevent_ai.domain.knowledge import Citation
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,3 +22,4 @@ class ChatResult:
     answer: str
     grounding: Grounding
     tool_called: str | None = None
+    citations: tuple[Citation, ...] = ()
