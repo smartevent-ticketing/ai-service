@@ -3,16 +3,16 @@
 **Nền tảng trợ lý hội thoại tiếng Việt cho hệ thống vé sự kiện SmartEvent.**
 
 [![CI](https://github.com/smartevent-ticketing/ai-service/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/smartevent-ticketing/ai-service/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-0.1.2-2563eb)
+![Version](https://img.shields.io/badge/version-0.2.0-2563eb)
 ![Python](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776ab?logo=python&logoColor=white)
 ![Business access](https://img.shields.io/badge/business_access-READ__ONLY-0f766e)
 
 Dịch vụ được tổ chức theo **Clean Architecture**, tách xử lý hội thoại khỏi giao thức HTTP, cấu hình và kết nối backend. Mục tiêu là hỗ trợ người dùng tìm hiểu sự kiện, làm rõ nhu cầu chọn vé và nhận hướng dẫn trên SmartEvent trong phạm vi quyền truy cập được kiểm chứng.
 
 > [!IMPORTANT]
-> **Phiên bản 0.1.2 là nền tảng phát triển, chưa sẵn sàng cho production.** API hội thoại và bộ hiểu ngôn ngữ theo luật đã hoạt động; toàn bộ **14 business tool mặc định bị tắt**. LLM/QLoRA, RAG, JEV và cơ chế ủy quyền truy cập dữ liệu tài khoản chưa được tích hợp. Dịch vụ không thực hiện giữ chỗ, đặt vé, thanh toán hoặc hoàn tiền thay người dùng.
+> **Phiên bản 0.2.0 là nền tảng phát triển, chưa sẵn sàng cho production.** Đã có ingest, chunking theo tokenizer, retrieval trích đoạn và citation. **RAG và 14 business tool mặc định bị tắt**; corpus khởi tạo đang là bản nháp. Embedding/hybrid mới dùng để benchmark offline; LLM/QLoRA, JEV và cơ chế ủy quyền dữ liệu tài khoản chưa được tích hợp. Dịch vụ không thực hiện giữ chỗ, đặt vé, thanh toán hoặc hoàn tiền thay người dùng.
 
-**Đi đến:** [Năng lực hiện tại](#năng-lực-hiện-tại) · [Tech stack](#tech-stack) · [Kiến trúc](#kiến-trúc) · [Chạy nhanh](#bắt-đầu-nhanh) · [API](#api) · [Cấu hình](#cấu-hình) · [Kiểm chứng](#kiểm-chứng-và-cicd) · [Tài liệu](#tài-liệu-và-lộ-trình)
+**Đi đến:** [Năng lực hiện tại](#năng-lực-hiện-tại) · [Tech stack](#tech-stack) · [Kiến trúc](#kiến-trúc) · [Chạy nhanh](#bắt-đầu-nhanh) · [API](#api) · [Cấu hình](#cấu-hình) · [Chunking và RAG](#chunking-và-rag) · [Kiểm chứng](#kiểm-chứng-và-cicd) · [Tài liệu](#tài-liệu-và-lộ-trình)
 
 ## Năng lực hiện tại
 
@@ -24,6 +24,8 @@ Dịch vụ được tổ chức theo **Clean Architecture**, tách xử lý h�
 | Gateway nghiệp vụ | Có registry, schema, projection và gate kiểm soát; mọi tool vẫn tắt |
 | HTTP transport | Giới hạn host/path, phương thức GET, thời gian, kích thước và cấu trúc JSON; chặn redirect và các đường dẫn GET có tác dụng ghi đã biết |
 | Quan sát request | Sinh `x-request-id`, ghi trạng thái và độ trễ theo tuyến; middleware không ghi nội dung hội thoại, state hay credential |
+| Tri thức chính sách | Ingest Markdown/TXT, chunking theo cấu trúc/tokenizer, BM25, kiểm tra nguồn và citation; cần gate và corpus được duyệt để bật |
+| Semantic/hybrid | Benchmark offline bằng ONNX CPU và reciprocal-rank fusion; chưa dùng phục vụ chat |
 | Công cụ dữ liệu | Chia tập xác định theo nhóm hội thoại và họ kịch bản; tạo manifest SHA-256 phục vụ tái lập |
 
 Khi chưa có dữ liệu nghiệp vụ được xác minh, API trả `grounding: NO_LIVE_DATA` và giải thích giới hạn. Việc nhận diện được ý định tìm sự kiện không đồng nghĩa dịch vụ đã truy vấn backend.
@@ -40,9 +42,11 @@ Các phiên bản dưới đây được lấy từ [`pyproject.toml`](pyproject
 | Kết nối backend | **HTTPX 0.28.1** | HTTP client bất đồng bộ, được bao bởi transport giới hạn quyền |
 | Cấu hình và schema | **PyYAML 6.0.3**, **jsonschema 4.26.0** | Registry/gate YAML và kiểm tra JSON Schema |
 | Xử lý nghiệp vụ | **Python standard library**, `dataclasses`, `Decimal` | Trạng thái hội thoại, bất biến và tính toán trong domain |
-| Kiểm thử | **pytest 9.0.2**, **pytest-asyncio 1.3.0**, **pytest-cov 7.0.0** | Unit, HTTP, contract và kiểm thử hồi quy bảo mật |
+| Kiểm thử | **pytest 9.0.3**, **pytest-asyncio 1.3.0**, **pytest-cov 7.0.0** | Unit, HTTP, contract và kiểm thử hồi quy bảo mật |
+| Chunking tùy chọn | **tokenizers 0.22.1** | Đếm token từ tokenizer JSON được pin; không tải model tự động |
+| Semantic tùy chọn | **ONNX Runtime 1.23.2**, **NumPy 2.3.4** | Inference embedding trên CPU và benchmark offline |
 | Chất lượng mã | **Ruff 0.14.14**, **Mypy 1.19.1** | Lint, định dạng và kiểm tra kiểu |
-| Phụ thuộc và đóng gói | **uv 0.12.6**, **pip**, **setuptools 82.0.1**, **pip-audit 2.10.1** | Khóa phụ thuộc theo hash, build wheel và kiểm tra advisory |
+| Phụ thuộc và đóng gói | **uv 0.12.6**, **pip**, **setuptools 83.0.0**, **pip-audit 2.10.1** | Khóa phụ thuộc theo hash, build wheel và kiểm tra advisory |
 | CI và container | **GitHub Actions**, **Docker** | Ma trận Windows/Linux, kiểm tra wheel độc lập và Docker smoke test |
 
 **Ngữ cảnh hệ thống:** SmartEvent sử dụng Next.js/BFF ở phía web và Spring Boot ở phía backend nghiệp vụ. Đây là các hệ thống tích hợp bên ngoài; AI Service hiện không kết nối trực tiếp cơ sở dữ liệu nghiệp vụ và không yêu cầu GPU hoặc model weights để chạy baseline.
@@ -58,6 +62,8 @@ flowchart TB
         HTTP["FastAPI<br/>Kiểm tra request / response"] --> Chat["ChatUseCase<br/>Điều phối hội thoại"]
         Chat <--> NLU["NLU tiếng Việt<br/>Baseline theo luật"]
         Chat --> Domain["Domain<br/>State · Intent · Tiêu chí tìm kiếm"]
+        Chat <--> Policy["Policy retrieval<br/>Nguồn · Thời hiệu · Citation"]
+        Policy --> Corpus["Index và catalog chỉ đọc<br/>Mặc định chưa bật"]
         Chat --> Gateway["Read-only Tool Gateway<br/>Schema · Gate · Projection"]
         Gateway --> Transport["SafeBackendTransport<br/>GET · Host/path cố định · Giới hạn"]
         Chat --> Composer["ResponseComposer<br/>Câu trả lời · Grounding · State"]
@@ -71,7 +77,7 @@ flowchart TB
     classDef gated fill:#fff7ed,stroke:#ea580c,color:#7c2d12;
     class Chat,Domain,Composer core;
     class HTTP,NLU boundary;
-    class Gateway,Transport,Backend gated;
+    class Gateway,Transport,Backend,Policy,Corpus gated;
 ```
 
 Sơ đồ thể hiện luồng xử lý và ranh giới tích hợp. Đường nét đứt là kết nối nghiệp vụ chưa được bật trong cấu hình mặc định.
@@ -141,8 +147,8 @@ Mở [Swagger UI](http://127.0.0.1:8001/docs) để thử API hoặc xem [OpenAP
 ### Chạy bằng Docker
 
 ```bash
-docker build -t smartevent-ai-service:0.1.2 .
-docker run --rm --name smartevent-ai -p 127.0.0.1:8001:8001 smartevent-ai-service:0.1.2
+docker build -t smartevent-ai-service:0.2.0 .
+docker run --rm --name smartevent-ai -p 127.0.0.1:8001:8001 smartevent-ai-service:0.2.0
 ```
 
 Container chạy bằng user không phải root, có healthcheck tại `/health/live` và sử dụng runtime lockfile có hash. Image nền hiện là `python:3.12-slim`; do tag này chưa cố định theo digest, lockfile Python không bảo đảm image luôn có byte giống hệt nhau qua các lần build.
@@ -169,7 +175,8 @@ Kết quả mặc định:
 {
   "status": "degraded",
   "business_tools_enabled": [],
-  "model_backend": "rule_based_baseline_only"
+  "model_backend": "rule_based_baseline_only",
+  "policy_retrieval": {"status": "disabled", "answer_mode": "extractive"}
 }
 ```
 
@@ -233,10 +240,13 @@ Phản hồi đầy đủ còn có `conversation_id` và các trường state kh
 | `BACKEND_BASE_URL` | `http://127.0.0.1:8080` | Origin backend do bên triển khai cấu hình, không lấy từ model hoặc request |
 | `CONFIG_DIR` | Thư mục `resources/` trong package | Chọn thư mục chứa bộ YAML đã được review; `.env.example` đặt thành `configs` |
 
-Hai tệp cấu hình runtime chính:
+Các tệp cấu hình runtime chính:
 
 - [`configs/runtime_tool_registry.yaml`](configs/runtime_tool_registry.yaml): endpoint, schema, projection, giới hạn và trạng thái từng tool.
 - [`configs/implementation_gates.yaml`](configs/implementation_gates.yaml): điều kiện và bằng chứng phải có trước khi bật tính năng.
+
+- [`configs/rag.yaml`](configs/rag.yaml): trạng thái RAG, trust anchors cho catalog/index và giới hạn truy xuất.
+- [`configs/schemas/`](configs/schemas/): hợp đồng nguồn, catalog, release và evaluation.
 
 `configs/` là nguồn cấu hình chuẩn trong repository. Các bản fallback tại `src/smartevent_ai/resources/` phải **giống từng byte**, giúp wheel khởi động từ thư mục bất kỳ. Sau khi sửa cấu hình, chạy:
 
@@ -246,6 +256,34 @@ python scripts/verify_runtime_config_sync.py
 
 Không có biến môi trường để bỏ qua gate hoặc bật riêng từng business tool. Thay đổi quyền cần được review cùng bằng chứng tích hợp tương ứng.
 
+## Chunking và RAG
+
+Hai công việc chia dữ liệu được tách riêng: `dataset_split.py` chia mẫu train/validation/test; `StructureChunker` chia nội dung tài liệu thành các chunk có provenance.
+
+**Pipeline offline:** kiểm tra catalog → đọc Markdown/TXT dưới corpus root → chuẩn hóa NFC/LF → chia heading/đoạn/bảng với tokenizer đã pin → xuất `release.json`, `chunks.jsonl` và build manifest → đánh giá → publish artifact bất biến. Profile khởi điểm là **384 token, overlap tối đa 64 token**, tính cả prefix/heading; cần benchmark trước khi coi là phù hợp với corpus thật.
+
+**Luồng chat:** lọc nguồn công khai đã duyệt/còn hiệu lực → BM25 → kiểm tra lại catalog → lấy nguyên phần cha chứa bằng chứng → trả trích đoạn với citation. Nếu phần nguồn đầy đủ vượt giới hạn phản hồi, dịch vụ không cắt bỏ điều kiện/ngoại lệ để tạo câu trả lời. Không có LLM tự sinh điều khoản.
+
+Chạy demo từ source checkout sau khi cài `requirements/dev.lock`:
+
+```bash
+python scripts/knowledge_smoke.py --output artifacts/knowledge-demo
+```
+
+Thư mục đầu ra phải mới. Demo dùng tokenizer BPE và tài liệu **TEST_ONLY**, kiểm tra cả nguồn nội bộ/không có bằng chứng. Demo không bật RAG và không tạo phê duyệt chính sách thật.
+
+Cài nhóm dependency tùy chọn có hash khi cần công cụ ingest/semantic ngoài môi trường dev:
+
+```bash
+python -m pip install --require-hashes -r requirements/rag.lock
+```
+
+Tokenizer JSON và ONNX model phải được cung cấp riêng với checksum/revision cố định; CLI không tự tải chúng. Runtime mặc định không import `tokenizers` hoặc `onnxruntime`, không xây index và không gọi mạng để tải model.
+
+Nguồn ban đầu ở [corpus FAQ bản nháp](datasets/knowledge_drafts/README.md). Xem [hướng dẫn vận hành RAG](docs/architecture/RAG_OPERATIONS.md), [quyết định kiến trúc](docs/architecture/ADR-003.md) và [bằng chứng kiểm tra 0.2.0](docs/architecture/RAG_QA_REPORT.md). Việc bật phục vụ cần cả `RAG-APPROVED-CORPUS` và `RAG-READONLY` đạt `PASS` với bằng chứng thật; môi trường bình thường từ chối corpus `TEST_ONLY`.
+
+API giữ `NO_LIVE_DATA` khi không đủ nguồn; câu trả lời chính sách có bằng chứng dùng `APPROVED_CORPUS` và `citations`. Citation chứa source ID/version, chunk ID và khoảng ký tự của phần nguồn được trích dẫn. `canonical_uri` có thể là định danh `approved://`, không mặc nhiên là URL website.
+
 ## Kiểm chứng và CI/CD
 
 [Workflow CI](.github/workflows/ci.yml) chạy trên **Windows và Ubuntu**, mỗi hệ điều hành với **Python 3.11 và 3.12**:
@@ -254,7 +292,7 @@ Không có biến môi trường để bỏ qua gate hoặc bật riêng từng 
 | :--- | :--- |
 | Mã nguồn | Compile, quy tắc Clean Architecture/READ_ONLY, Ruff, định dạng và Mypy |
 | Hành vi | Unit, HTTP, contract, kiểm thử hồi quy bảo mật; coverage tối thiểu **90%** |
-| Tính toàn vẹn | Lockfile/export, cấu hình nguồn và package, ngữ cảnh v1.2, source manifest |
+| Tính toàn vẹn | Knowledge schemas, lockfile/export, cấu hình nguồn và package, ngữ cảnh v1.2, source manifest |
 | Phân phối | Build wheel, cài vào môi trường riêng và kiểm tra từ thư mục trống |
 | Dependency | `pip-audit` trên runtime lockfile, không bỏ qua advisory bằng ngoại lệ |
 | Container | Build image, kiểm tra liveness và xác nhận readiness mặc định vẫn `degraded` |
@@ -270,6 +308,7 @@ python -m compileall -q src scripts tests
 python scripts/static_verify.py
 python scripts/verify_runtime_config_sync.py
 python scripts/verify_dependency_locks.py
+python scripts/export_knowledge_schemas.py --verify
 python -m ruff check src tests scripts
 python -m ruff format --check src tests scripts
 python -m mypy src
@@ -277,6 +316,7 @@ python -m pytest -q --cov=smartevent_ai --cov-report=term-missing --cov-fail-und
 python scripts/verify_contexts.py
 python scripts/source_manifest.py --verify
 python -m pip_audit --no-deps --disable-pip -r requirements/runtime.lock
+python -m pip_audit --no-deps --disable-pip -r requirements/rag.lock
 python -m pip wheel --no-deps --no-build-isolation . -w dist/wheel
 python scripts/wheel_smoke.py dist/wheel
 ```
@@ -299,7 +339,7 @@ ai-service/
 │   ├── resources/             # Bản fallback cấu hình runtime
 │   └── tooling/               # Công cụ chia dataset xác định
 ├── configs/                   # Cấu hình runtime chuẩn
-├── datasets/examples/         # Dữ liệu tổng hợp mẫu
+├── datasets/                  # Mẫu huấn luyện và corpus FAQ bản nháp
 ├── tests/                     # Bộ kiểm thử runtime
 ├── scripts/                   # Kiểm chứng, đóng gói và xuất mã nguồn
 ├── requirements/              # Dependency lockfile có hash
@@ -330,7 +370,7 @@ Các bước phát triển tiếp theo tập trung vào:
 - Chứng minh phạm vi công khai và quyền sở hữu trên backend, bao gồm dữ liệu con của sự kiện.
 - Tích hợp ủy quyền BFF cho dữ liệu cá nhân theo `CUSTOMER_SELF_ONLY`, kèm kiểm thử chéo tài khoản và loại bỏ trường nhạy cảm.
 - Kiểm thử tích hợp READ_ONLY với trace không ghi nghiệp vụ và snapshot cơ sở dữ liệu không thay đổi.
-- Xây dựng corpus RAG được phê duyệt; đánh giá model/QLoRA và JEV trước khi đưa vào luồng hội thoại.
+- Phê duyệt corpus RAG và bộ câu hỏi đủ đa dạng; hiệu chuẩn semantic/reranker nếu có nhu cầu. Đánh giá model/QLoRA và JEV trước khi đưa vào luồng hội thoại.
 - Kiểm thử hiệu năng và kiểm soát lạm dụng trước khi mở dịch vụ ra môi trường công khai.
 
 Dataset tổng hợp mẫu chỉ minh họa công cụ. Phân tách không đủ train/validation/test sẽ được đánh dấu `evaluation_ready=false`; chưa có cơ sở dùng bộ mẫu này để công bố chất lượng model.

@@ -12,7 +12,7 @@ enabled by this document, environment variables or unit-test success.
 | AI-003 | Runtime zero-write | Security + QA maintainers | BLOCKED: network trace and unchanged business DB snapshots |
 | AI-004 | Live optimizer | Recommendation maintainer | BLOCKED: quotas, valid seats, complete timestamped snapshots, TTL/revalidation and hard-constraint golden cases |
 | AI-005 | Full dialogue ontology | Dialogue maintainer | NOT_IMPLEMENTED: candidate references, exclusions/ADD, date parsing and full task/slot coverage; never guess unseen candidates |
-| AI-006 | Approved RAG | Policy owner + retrieval maintainer | BLOCKED: reviewed effective corpus, audience filters, citations and injection/expiry negatives |
+| AI-006 | Approved RAG | Policy owner + retrieval maintainer | BASELINE IMPLEMENTED in 0.2.0: ingest/chunking/BM25/citations and offline ONNX benchmark. RELEASE BLOCKED: starter corpus is draft; real source approval and held-out evaluation remain required |
 | AI-007 | Model/JEV evaluation | ML maintainer | NOT_RUN: reviewed diverse data, near-duplicate held-out checks, model/Git/data/run hashes and fallback benchmark |
 | AI-008 | Public exposure controls | Infrastructure + service maintainers | NOT_RUN: authenticated BFF perimeter, body/admission/rate limits, load/SLO tests, retention and operational alerts |
 | AI-009 | Deployment evidence | Release maintainer | NOT_RUN until recorded: remote CI, Docker build/smoke and reviewed base-image policy |

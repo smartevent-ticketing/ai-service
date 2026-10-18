@@ -1,0 +1,280 @@
+{
+  "cases_sha256": "e88e1cdc52494d0c0f1d339f2e1a9126fc16c6b6f2ce3dcbc59f9e97df304451",
+  "dense_abstention_calibrated": false,
+  "dimension": 384,
+  "embedding_build_ms": 45.0688999844715,
+  "embedding_profile": {
+    "dimension": 384,
+    "document_prefix": "passage: ",
+    "model_id": "Xenova/multilingual-e5-small",
+    "normalization": "L2",
+    "pooling": "attention_mask_mean",
+    "provider": "CPUExecutionProvider",
+    "query_prefix": "query: ",
+    "revision": "761b726dd34fb83930e26aab4e9ac3899aa1fa78",
+    "sha256": "f80102d3f2a1229f387d3c81909990d8945513e347b0eab049f7de3c6f98c193",
+    "tokenizer": {
+      "context_window": 512,
+      "measurement": "model_tokens",
+      "model_id": "Xenova/multilingual-e5-small",
+      "prefix": "passage: ",
+      "revision": "761b726dd34fb83930e26aab4e9ac3899aa1fa78",
+      "sha256": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39"
+    }
+  },
+  "embedding_profile_sha256": "5e84ea231faa12270f6f9ec7a3446661a6ac78e9b897e05f42dc9446c7c24b47",
+  "evidence": "OFFLINE_RETRIEVAL_ONLY",
+  "measurement_notes": {
+    "corpus": "TEST_ONLY, 2 eligible public documents; not a production benchmark",
+    "latency": "Combined query embedding, lexical, dense and RRF work; excludes model loading",
+    "process_peak_ram": "NOT_MEASURED; vector_payload_bytes is not process RAM",
+    "query_latency_p50_ms": 4.0831000078469515,
+    "query_latency_p95_ms": 5.167399998754263
+  },
+  "python": "3.12.10",
+  "recall_at_5": {
+    "dev": {
+      "bm25": 1.0,
+      "dense": 1.0,
+      "hybrid_rrf": 1.0
+    },
+    "test": {
+      "bm25": 1.0,
+      "dense": 1.0,
+      "hybrid_rrf": 1.0
+    }
+  },
+  "release_sha256": "908e1480b0d2b414b6e4d4d2f11811195a3bbb87a75f7b2ad604cfab03e990a2",
+  "results": [
+    {
+      "case_id": "refund-dev",
+      "expected": [
+        "TEST-REFUND@1.0.0"
+      ],
+      "latency_ms": 4.218599991872907,
+      "rankings": {
+        "bm25": [
+          "TEST-REFUND@1.0.0"
+        ],
+        "dense": [
+          "TEST-REFUND@1.0.0",
+          "TEST-GUIDE@1.0.0"
+        ],
+        "hybrid_rrf": [
+          "TEST-REFUND@1.0.0",
+          "TEST-GUIDE@1.0.0"
+        ]
+      },
+      "split": "dev"
+    },
+    {
+      "case_id": "refund-dev-plain",
+      "expected": [
+        "TEST-REFUND@1.0.0"
+      ],
+      "latency_ms": 4.545899981167167,
+      "rankings": {
+        "bm25": [
+          "TEST-REFUND@1.0.0"
+        ],
+        "dense": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ],
+        "hybrid_rrf": [
+          "TEST-REFUND@1.0.0",
+          "TEST-GUIDE@1.0.0"
+        ]
+      },
+      "split": "dev"
+    },
+    {
+      "case_id": "guide-dev",
+      "expected": [
+        "TEST-GUIDE@1.0.0"
+      ],
+      "latency_ms": 4.2283000075258315,
+      "rankings": {
+        "bm25": [
+          "TEST-GUIDE@1.0.0"
+        ],
+        "dense": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ],
+        "hybrid_rrf": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ]
+      },
+      "split": "dev"
+    },
+    {
+      "case_id": "negative-dev",
+      "expected": [],
+      "latency_ms": 3.667600016342476,
+      "rankings": {
+        "bm25": [],
+        "dense": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ],
+        "hybrid_rrf": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ]
+      },
+      "split": "dev"
+    },
+    {
+      "case_id": "private-dev",
+      "expected": [],
+      "latency_ms": 5.167399998754263,
+      "rankings": {
+        "bm25": [],
+        "dense": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ],
+        "hybrid_rrf": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ]
+      },
+      "split": "dev"
+    },
+    {
+      "case_id": "refund-test",
+      "expected": [
+        "TEST-REFUND@1.0.0"
+      ],
+      "latency_ms": 3.6902999854646623,
+      "rankings": {
+        "bm25": [
+          "TEST-REFUND@1.0.0"
+        ],
+        "dense": [
+          "TEST-REFUND@1.0.0",
+          "TEST-GUIDE@1.0.0"
+        ],
+        "hybrid_rrf": [
+          "TEST-REFUND@1.0.0",
+          "TEST-GUIDE@1.0.0"
+        ]
+      },
+      "split": "test"
+    },
+    {
+      "case_id": "refund-exceptions",
+      "expected": [
+        "TEST-REFUND@1.0.0"
+      ],
+      "latency_ms": 3.881899989210069,
+      "rankings": {
+        "bm25": [
+          "TEST-REFUND@1.0.0"
+        ],
+        "dense": [
+          "TEST-REFUND@1.0.0",
+          "TEST-GUIDE@1.0.0"
+        ],
+        "hybrid_rrf": [
+          "TEST-REFUND@1.0.0",
+          "TEST-GUIDE@1.0.0"
+        ]
+      },
+      "split": "test"
+    },
+    {
+      "case_id": "guide-test",
+      "expected": [
+        "TEST-GUIDE@1.0.0"
+      ],
+      "latency_ms": 4.235500004142523,
+      "rankings": {
+        "bm25": [
+          "TEST-GUIDE@1.0.0"
+        ],
+        "dense": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ],
+        "hybrid_rrf": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ]
+      },
+      "split": "test"
+    },
+    {
+      "case_id": "inventory-test",
+      "expected": [
+        "TEST-GUIDE@1.0.0"
+      ],
+      "latency_ms": 3.8255999970715493,
+      "rankings": {
+        "bm25": [
+          "TEST-GUIDE@1.0.0"
+        ],
+        "dense": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ],
+        "hybrid_rrf": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ]
+      },
+      "split": "test"
+    },
+    {
+      "case_id": "negative-test",
+      "expected": [],
+      "latency_ms": 4.0831000078469515,
+      "rankings": {
+        "bm25": [],
+        "dense": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ],
+        "hybrid_rrf": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ]
+      },
+      "split": "test"
+    },
+    {
+      "case_id": "out-of-scope-test",
+      "expected": [],
+      "latency_ms": 3.4995999885722995,
+      "rankings": {
+        "bm25": [],
+        "dense": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ],
+        "hybrid_rrf": [
+          "TEST-GUIDE@1.0.0",
+          "TEST-REFUND@1.0.0"
+        ]
+      },
+      "split": "test"
+    }
+  ],
+  "runtime_enable_authorized": false,
+  "source_hit_at_1": {
+    "dev": {
+      "bm25": 1.0,
+      "dense": 0.6666666666666666,
+      "hybrid_rrf": 1.0
+    },
+    "test": {
+      "bm25": 1.0,
+      "dense": 1.0,
+      "hybrid_rrf": 1.0
+    }
+  },
+  "vector_count": 4,
+  "vector_payload_bytes": 6144
+}

@@ -1,0 +1,31 @@
+{
+  "cases_sha256": "e88e1cdc52494d0c0f1d339f2e1a9126fc16c6b6f2ce3dcbc59f9e97df304451",
+  "catalog_sha256": "0c90caae82d3deb7a312f9e0dcdf911dc980fe7f3ee69d3b1e37ee366e2f63d0",
+  "evaluated_at": "2026-10-18T06:21:19+00:00",
+  "evidence": "OFFLINE_ONLY",
+  "format_version": 1,
+  "metrics": {
+    "dev": {
+      "cases": 5,
+      "latency_p50_ms": 1.8847999745048583,
+      "latency_p95_ms": 3.2518999942112714,
+      "mrr_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "negative_abstention_rate": 1.0,
+      "recall_at_5": 1.0
+    },
+    "test": {
+      "cases": 6,
+      "latency_p50_ms": 2.0330999977886677,
+      "latency_p95_ms": 2.737000002525747,
+      "mrr_at_5": 1.0,
+      "ndcg_at_5": 1.0,
+      "negative_abstention_rate": 1.0,
+      "recall_at_5": 1.0
+    }
+  },
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.10",
+  "release_sha256": "dc1c51c2412d0c63f5bf7d481bea424d94765d88de9d974ef0e4ccc1f54b23c7",
+  "runtime_enable_authorized": false
+}

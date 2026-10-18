@@ -1,0 +1,73 @@
+{
+  "created_date": "2026-10-18",
+  "format": "DRAFT_SOURCE_LIST_NOT_INGEST_CATALOG",
+  "runtime_enable_authorized": false,
+  "sources": [
+    {
+      "approved_at": null,
+      "canonical_uri": "approved://drafts/01_gioi_han_tro_ly",
+      "content_sha256": "c1ef84b05dfa66551a1ac69b15a4e4bb1a9677a9215a7729790a0bd0b8b525f1",
+      "effective_from": null,
+      "effective_until": null,
+      "owner": null,
+      "path": "01_gioi_han_tro_ly.md",
+      "reviewer": null,
+      "source_id": "DRAFT-01",
+      "status": "draft",
+      "version": "0.1.0-draft"
+    },
+    {
+      "approved_at": null,
+      "canonical_uri": "approved://drafts/02_tim_su_kien_va_ton_kho",
+      "content_sha256": "a674d02d4967d4a277cb86d2c2b34fc4f23efa4ecb1b93ab7e37a51eb3cb553c",
+      "effective_from": null,
+      "effective_until": null,
+      "owner": null,
+      "path": "02_tim_su_kien_va_ton_kho.md",
+      "reviewer": null,
+      "source_id": "DRAFT-02",
+      "status": "draft",
+      "version": "0.1.0-draft"
+    },
+    {
+      "approved_at": null,
+      "canonical_uri": "approved://drafts/03_hoi_thoai_va_du_lieu",
+      "content_sha256": "01033df60ee092cbb38936b1a7369f58255bb72e26de7af2bb2ecd4e42984b11",
+      "effective_from": null,
+      "effective_until": null,
+      "owner": null,
+      "path": "03_hoi_thoai_va_du_lieu.md",
+      "reviewer": null,
+      "source_id": "DRAFT-03",
+      "status": "draft",
+      "version": "0.1.0-draft"
+    },
+    {
+      "approved_at": null,
+      "canonical_uri": "approved://drafts/04_hoan_tien_va_ho_tro",
+      "content_sha256": "cbb9233a5832b95cf5570875818efd20faa405608392f0ff89bd3e640d9e5628",
+      "effective_from": null,
+      "effective_until": null,
+      "owner": null,
+      "path": "04_hoan_tien_va_ho_tro.md",
+      "reviewer": null,
+      "source_id": "DRAFT-04",
+      "status": "draft",
+      "version": "0.1.0-draft"
+    },
+    {
+      "approved_at": null,
+      "canonical_uri": "approved://drafts/05_huong_dan_thao_tac",
+      "content_sha256": "52f687431941b1e8d07c8671e9c1c7702d870c3dde2d0b874f63331005ca8bbf",
+      "effective_from": null,
+      "effective_until": null,
+      "owner": null,
+      "path": "05_huong_dan_thao_tac.md",
+      "reviewer": null,
+      "source_id": "DRAFT-05",
+      "status": "draft",
+      "version": "0.1.0-draft"
+    }
+  ],
+  "status": "draft"
+}
