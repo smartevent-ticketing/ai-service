@@ -1,0 +1,11 @@
+{"case_id":"refund-dev","group":"refund-direct","split":"dev","query":"chính sách hoàn tiền","expected_sources":["TEST-REFUND@1.0.0"]}
+{"case_id":"refund-dev-plain","group":"refund-direct","split":"dev","query":"chinh sach hoan tien","expected_sources":["TEST-REFUND@1.0.0"]}
+{"case_id":"guide-dev","group":"guide-ui","split":"dev","query":"thao tác trên giao diện","expected_sources":["TEST-GUIDE@1.0.0"]}
+{"case_id":"negative-dev","group":"astronomy-dev","split":"dev","query":"thiên văn lượng tử","expected_sources":[]}
+{"case_id":"private-dev","group":"private-canary","split":"dev","query":"STAFF_SECRET_TEST_ONLY","expected_sources":[]}
+{"case_id":"refund-test","group":"refund-conditions","split":"test","query":"điều kiện hoàn tiền","expected_sources":["TEST-REFUND@1.0.0"]}
+{"case_id":"refund-exceptions","group":"refund-exception","split":"test","query":"ngoại lệ hoàn tiền","expected_sources":["TEST-REFUND@1.0.0"]}
+{"case_id":"guide-test","group":"guide-reservation","split":"test","query":"giữ chỗ đặt vé thanh toán","expected_sources":["TEST-GUIDE@1.0.0"]}
+{"case_id":"inventory-test","group":"guide-inventory","split":"test","query":"toàn bộ tồn kho backend","expected_sources":["TEST-GUIDE@1.0.0"]}
+{"case_id":"negative-test","group":"weather-test","split":"test","query":"dự báo khí tượng thủy văn","expected_sources":[]}
+{"case_id":"out-of-scope-test","group":"software-test","split":"test","query":"biên dịch javascript rust","expected_sources":[]}

@@ -33,6 +33,8 @@ def test_verified_source_export_excludes_local_files(
         "reports/private.md",
         ".venv/secret.txt",
         "__pycache__/local.pyc",
+        "src/artifacts/index.json",
+        "tests/.models/weights.bin",
     ):
         local = workspace / filename
         local.parent.mkdir(parents=True, exist_ok=True)
