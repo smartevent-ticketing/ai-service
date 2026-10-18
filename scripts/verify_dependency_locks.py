@@ -19,7 +19,11 @@ def main() -> None:
         check=True,
         timeout=60,
     )
-    for filename, flags in (("runtime.lock", ["--no-dev"]), ("dev.lock", [])):
+    for filename, flags in (
+        ("runtime.lock", ["--no-dev"]),
+        ("dev.lock", []),
+        ("rag.lock", ["--no-dev", "--extra", "rag-ingest", "--extra", "rag-semantic"]),
+    ):
         result = subprocess.run(  # noqa: S603 -- fixed module and export options
             [
                 sys.executable,

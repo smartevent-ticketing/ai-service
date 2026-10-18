@@ -1,6 +1,6 @@
 [project]
 name = "smartevent-ai-service"
-version = "0.1.2"
+version = "0.2.0"
 description = "Read-only SmartEvent AI assistant Clean Architecture foundation"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -14,26 +14,33 @@ dependencies = [
   "PyYAML==6.0.3",
   "jsonschema==4.26.0"
 ]
+[project.optional-dependencies]
+rag-ingest = ["tokenizers==0.22.1"]
+rag-semantic = ["tokenizers==0.22.1", "numpy==2.3.4", "onnxruntime==1.23.2"]
 [dependency-groups]
 dev = [
-  "pytest==9.0.2",
+  "pytest==9.0.3",
   "pytest-cov==7.0.0",
   "ruff==0.14.14",
   "mypy==1.19.1",
   "pytest-asyncio==1.3.0",
   "types-jsonschema==4.26.0.20261006",
-  "setuptools==82.0.1",
+  "setuptools==83.0.0",
   "pip-audit==2.10.1",
-  "uv==0.12.6"
+  "uv==0.12.6",
+  "tokenizers==0.22.1",
+  "numpy==2.3.4",
+  "onnxruntime==1.23.2",
+  "onnx==1.22.0"
 ]
 [build-system]
-requires = ["setuptools==82.0.1"]
+requires = ["setuptools==83.0.0"]
 build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-smartevent_ai = ["resources/*.yaml"]
+smartevent_ai = ["resources/*.yaml", "resources/schemas/*.json"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
@@ -57,4 +64,10 @@ files = ["src"]
 exclude = "docs/contexts/"
 [[tool.mypy.overrides]]
 module = ["yaml", "yaml.*"]
+ignore_missing_imports = true
+[[tool.mypy.overrides]]
+module = ["tokenizers", "tokenizers.*"]
+ignore_missing_imports = true
+[[tool.mypy.overrides]]
+module = ["onnxruntime", "onnxruntime.*"]
 ignore_missing_imports = true

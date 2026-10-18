@@ -1,4 +1,4 @@
-.PHONY: setup compile static lint typecheck test contexts configs manifest package wheel-smoke check run
+.PHONY: setup compile static lint typecheck test contexts configs manifest package wheel-smoke knowledge-smoke check run
 
 setup:
 	python -m pip install --require-hashes -r requirements/dev.lock
@@ -24,6 +24,10 @@ contexts:
 
 configs:
 	python scripts/verify_runtime_config_sync.py
+	python scripts/export_knowledge_schemas.py --verify
+
+knowledge-smoke:
+	python scripts/knowledge_smoke.py --output artifacts/knowledge-smoke
 
 manifest:
 	python scripts/source_manifest.py --verify

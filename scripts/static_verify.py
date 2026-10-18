@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +20,12 @@ INNER_FORBIDDEN_PREFIXES = (
     "sqlalchemy",
     "psycopg",
     "redis",
+    "langchain",
+    "tokenizers",
+    "transformers",
+    "sentence_transformers",
+    "onnxruntime",
+    "numpy",
 )
 
 
@@ -36,9 +43,15 @@ for file in SOURCE.rglob("*.py"):
     tree = ast.parse(file.read_text(encoding="utf-8"), filename=str(file))
     rel = file.relative_to(ROOT).as_posix()
     modules = imported_modules(tree)
+    if "/tooling/" not in rel and any(m.startswith("smartevent_ai.tooling") for m in modules):
+        errors.append(f"Runtime layer imports offline tooling/writers: {rel}")
 
     if "/domain/" in rel:
         for module in modules:
+            if module.split(".")[0] not in sys.stdlib_module_names and not module.startswith(
+                "smartevent_ai.domain"
+            ):
+                errors.append(f"Domain must be standard-library-only: {rel}: {module}")
             if (
                 module.startswith("smartevent_ai.application")
                 or module.startswith("smartevent_ai.adapters")

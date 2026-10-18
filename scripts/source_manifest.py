@@ -20,6 +20,8 @@ EXCLUDED_DIR_NAMES = {
     "dist",
     "reports",
     "htmlcov",
+    "artifacts",
+    ".models",
 }
 EXCLUDED_FILE_NAMES = {".coverage", "MANIFEST_SHA256.json"}
 SOURCE_DIRECTORIES = {

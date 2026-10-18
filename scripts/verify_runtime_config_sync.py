@@ -6,16 +6,6 @@ import hashlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PAIRS = (
-    (
-        ROOT / "configs/runtime_tool_registry.yaml",
-        ROOT / "src/smartevent_ai/resources/runtime_tool_registry.yaml",
-    ),
-    (
-        ROOT / "configs/implementation_gates.yaml",
-        ROOT / "src/smartevent_ai/resources/implementation_gates.yaml",
-    ),
-)
 
 
 def digest(path: Path) -> str:
@@ -24,7 +14,19 @@ def digest(path: Path) -> str:
 
 def main() -> None:
     mismatches: list[str] = []
-    for source, packaged in PAIRS:
+    source_root, package_root = ROOT / "configs", ROOT / "src/smartevent_ai/resources"
+    expected = {
+        p.relative_to(source_root) for p in source_root.rglob("*") if p.suffix in (".yaml", ".json")
+    }
+    actual = {
+        p.relative_to(package_root)
+        for p in package_root.rglob("*")
+        if p.suffix in (".yaml", ".json")
+    }
+    if expected != actual:
+        mismatches.append("Config/schema source and package file sets differ")
+    for relative in sorted(expected | actual):
+        source, packaged = source_root / relative, package_root / relative
         if not source.is_file() or not packaged.is_file():
             mismatches.append(f"missing config pair: {source} / {packaged}")
             continue
