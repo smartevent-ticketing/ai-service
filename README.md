@@ -336,12 +336,17 @@ ai-service/
 │   │   ├── inbound/           # FastAPI, DTO và telemetry
 │   │   └── outbound/          # NLU baseline, gateway và HTTP transport
 │   ├── infrastructure/        # Settings và composition root
-│   ├── resources/             # Bản fallback cấu hình runtime
-│   └── tooling/               # Công cụ chia dataset xác định
-├── configs/                   # Cấu hình runtime chuẩn
+│   ├── resources/             # Bản fallback cấu hình runtime (do configs/ sinh ra,
+│   │                            # không sửa tay; kiểm tra bằng verify_runtime_config_sync)
+│   ├── tooling/
+│   │   ├── dataset_split.py     # Chia tập mẫu xác định theo nhóm hội thoại
+│   │   └── offline_jobs/        # Build/publish/evaluate/benchmark tri thức offline;
+│   │                            # không bao giờ import từ runtime HTTP
+├── configs/                   # Cấu hình runtime chuẩn (nguồn duy nhất sửa tay)
 ├── datasets/                  # Mẫu huấn luyện và corpus FAQ bản nháp
-├── tests/                     # Bộ kiểm thử runtime
-├── scripts/                   # Kiểm chứng, đóng gói và xuất mã nguồn
+├── tests/                     # Bộ kiểm thử runtime (+ test_distribution khóa sync/gen)
+├── scripts/                   # Kiểm chứng, tri thức offline, đóng gói/xuất mã nguồn
+│                              # (+ sync_configs_to_resources.py, export_dev_tools.py)
 ├── requirements/              # Dependency lockfile có hash
 ├── docs/
 │   ├── architecture/          # ADR, audit và điều kiện phát hành
