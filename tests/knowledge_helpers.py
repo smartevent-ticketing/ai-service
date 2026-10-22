@@ -17,8 +17,8 @@ from smartevent_ai.domain.knowledge import (
     digest,
 )
 from smartevent_ai.infrastructure.knowledge_config import RagConfig
-from smartevent_ai.tooling.knowledge.build_index import build_index
-from smartevent_ai.tooling.knowledge.evaluate import FrozenArtifacts
+from smartevent_ai.tooling.offline_jobs.build_index import build_index
+from smartevent_ai.tooling.offline_jobs.evaluate import FrozenArtifacts
 
 FIXTURES = Path(__file__).parent / "fixtures/rag"
 NOW = datetime.now(UTC).replace(microsecond=0)

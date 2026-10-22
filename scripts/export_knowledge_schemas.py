@@ -12,7 +12,7 @@ from smartevent_ai.adapters.outbound.knowledge.contracts import (
     canonical_json,
 )
 from smartevent_ai.infrastructure.knowledge_config import RagConfig
-from smartevent_ai.tooling.knowledge.evaluate import EvaluationCase
+from smartevent_ai.tooling.offline_jobs.evaluate import EvaluationCase
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMAS = {

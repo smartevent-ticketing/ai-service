@@ -30,7 +30,7 @@ python scripts/knowledge_smoke.py --output artifacts/knowledge-demo
 CLI không tự tải tokenizer/model và không suy ra phê duyệt từ nội dung:
 
 ```bash
-python -m smartevent_ai.tooling.knowledge.build_index --help
+python -m smartevent_ai.tooling.offline_jobs.build_index --help
 ```
 
 Các tham số bắt buộc gồm `--corpus-root`, `--catalog`, `--catalog-sha256`,
@@ -46,8 +46,8 @@ bị từ chối thay vì cắt âm thầm. Giới hạn loader Markdown/TXT là
 ## Đánh giá
 
 ```bash
-python -m smartevent_ai.tooling.knowledge.evaluate --help
-python -m smartevent_ai.tooling.knowledge.benchmark_semantic --help
+python -m smartevent_ai.tooling.offline_jobs.evaluate --help
+python -m smartevent_ai.tooling.offline_jobs.benchmark_semantic --help
 ```
 
 Evaluation nhận catalog/release cùng checksum, tập câu hỏi JSONL theo schema riêng,
@@ -70,7 +70,7 @@ benchmark model đa ngôn ngữ thật là bằng chứng riêng được lưu d
 ## Publish và rollback
 
 ```bash
-python -m smartevent_ai.tooling.knowledge.publish artifacts/knowledge-demo/build artifacts/published
+python -m smartevent_ai.tooling.offline_jobs.publish artifacts/knowledge-demo/build artifacts/published
 ```
 
 Publisher kiểm checksum rồi tạo thư mục bất biến theo release hash và thay

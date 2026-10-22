@@ -11,9 +11,9 @@ from smartevent_ai.adapters.outbound.knowledge.contracts import canonical_json
 from smartevent_ai.adapters.outbound.knowledge.structure_chunker import StructureChunker
 from smartevent_ai.adapters.outbound.knowledge.tokenizer import LocalTokenizer
 from smartevent_ai.domain.knowledge import ChunkingPolicy, KnowledgeError, digest
-from smartevent_ai.tooling.knowledge.build_index import build_index
-from smartevent_ai.tooling.knowledge.evaluate import evaluate
-from smartevent_ai.tooling.knowledge.publish import publish
+from smartevent_ai.tooling.offline_jobs.build_index import build_index
+from smartevent_ai.tooling.offline_jobs.evaluate import evaluate
+from smartevent_ai.tooling.offline_jobs.publish import publish
 
 ROOT = Path(__file__).resolve().parents[1]
 

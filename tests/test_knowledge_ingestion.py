@@ -10,9 +10,9 @@ from smartevent_ai.adapters.outbound.knowledge.document_loader import LocalDocum
 from smartevent_ai.adapters.outbound.knowledge.structure_chunker import StructureChunker
 from smartevent_ai.application.ingest_knowledge import IngestKnowledge
 from smartevent_ai.domain.knowledge import KnowledgeError, digest
-from smartevent_ai.tooling.knowledge.build_index import build_index
-from smartevent_ai.tooling.knowledge.evaluate import FrozenArtifacts
-from smartevent_ai.tooling.knowledge.publish import publish
+from smartevent_ai.tooling.offline_jobs.build_index import build_index
+from smartevent_ai.tooling.offline_jobs.evaluate import FrozenArtifacts
+from smartevent_ai.tooling.offline_jobs.publish import publish
 
 
 def test_build_is_byte_identical_and_published_pointer_is_atomic(tmp_path) -> None:
