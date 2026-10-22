@@ -37,6 +37,32 @@ def test_sync_check_detects_hand_edited_resources_and_write_repairs(
     assert (package / "tool.yaml").read_bytes() == b"enabled: false\n"
 
 
+def test_repeated_dependency_pins_stay_consistent() -> None:
+    pins: dict[str, set[str]] = {}
+    declared = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    for name in ("tokenizers", "numpy", "onnxruntime"):
+        versions = {
+            line.split(f'"{name}==')[1].split('"')[0]
+            for line in declared.splitlines()
+            if f'"{name}==' in line
+        }
+        direct = (ROOT / "requirements/dev.txt").read_text(encoding="utf-8").splitlines()
+        versions |= {line.split("==")[1].strip() for line in direct if line.startswith(f"{name}==")}
+        assert versions, f"pin for {name} missing"
+        pins[name] = versions
+    for name, versions in pins.items():
+        assert len(versions) == 1, f"conflicting pins for {name}: {sorted(versions)}"
+
+
+def test_dev_txt_is_generated_from_dev_lock() -> None:
+    module = load_script("export_dev_tools")
+    rendered = module.render(
+        (ROOT / "requirements/dev.lock").read_text(encoding="utf-8"),
+        (ROOT / "pyproject.toml").read_text(encoding="utf-8"),
+    )
+    assert rendered == (ROOT / "requirements/dev.txt").read_text(encoding="utf-8")
+
+
 def test_verified_source_export_excludes_local_files(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

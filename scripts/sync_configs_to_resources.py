@@ -19,9 +19,7 @@ def digest(path: Path) -> str:
 
 def tracked_files(root: Path) -> set[Path]:
     return {
-        p.relative_to(root)
-        for p in root.rglob("*")
-        if p.is_file() and p.suffix in TRACKED_SUFFIXES
+        p.relative_to(root) for p in root.rglob("*") if p.is_file() and p.suffix in TRACKED_SUFFIXES
     }
 
 
