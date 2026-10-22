@@ -19,6 +19,24 @@ def load_script(name: str) -> ModuleType:
     return module
 
 
+def test_sync_check_detects_hand_edited_resources_and_write_repairs(
+    tmp_path: Path,
+) -> None:
+    module = load_script("sync_configs_to_resources")
+    source = tmp_path / "configs"
+    package = tmp_path / "resources"
+    source.mkdir()
+    package.mkdir()
+    (source / "tool.yaml").write_bytes(b"enabled: false\n")
+    (package / "tool.yaml").write_bytes(b"enabled: true\n")
+    assert module.find_drift(source, package) != []
+    with pytest.raises(SystemExit):
+        module.main(["--check", "--source", str(source), "--package", str(package)])
+    module.main(["--write", "--source", str(source), "--package", str(package)])
+    assert module.find_drift(source, package) == []
+    assert (package / "tool.yaml").read_bytes() == b"enabled: false\n"
+
+
 def test_verified_source_export_excludes_local_files(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
