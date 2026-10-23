@@ -39,3 +39,17 @@ cross-platform byte/hash fixes. Transport requests identity encoding and rejects
 compressed payloads before iteration, keeping the byte cap independent of HTTP
 decompression. Tool deadlines cover the full awaited HTTP operation. Runtime
 configs and integration gate statuses are unchanged.
+
+## Immutability addendum — 2026-10-23 (P0)
+
+An uncommitted working-tree edit had added `"synthetic_unreviewed"` to the
+`metadata.source` enum in the immutable historical file
+`docs/contexts/v1.2/schemas/training_sample.schema.json` (line 1571). Per
+`AGENTS.md` §2 and `ADR-001`, `docs/contexts/v1.2/` is immutable historical
+evidence and must never be edited in place.
+
+Resolution: the file was restored byte-identical via `git restore` (no
+commit of the edit); `scripts/verify_contexts.py` passes (49 files). No
+correction content was merged into the historical file. Any future need for
+a `synthetic_unreviewed` source label belongs in a new contract version
+under `configs/schemas/` with its own review, never as an edit to v1.2.
