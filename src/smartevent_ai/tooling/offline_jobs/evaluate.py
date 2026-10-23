@@ -81,15 +81,32 @@ def evaluate(
         ArtifactKnowledgeStore(source, allow_test=True), BM25Retriever(), FrozenClock(now), limit=5
     )
     metrics: dict[str, object] = {}
+    timeouts: dict[str, int] = {}
+    records: list[dict[str, object]] = []
     for split in ("dev", "test"):
         positives = hits = reciprocal = ndcg = true_negative = negatives = 0.0
         durations: list[float] = []
         for row in (r for r in rows if r.split == split):
             started = perf_counter()
             answer = reader.answer(row.query)
-            durations.append((perf_counter() - started) * 1000)
+            elapsed_ms = (perf_counter() - started) * 1000
+            durations.append(elapsed_ms)
+            if elapsed_ms > 2000:
+                timeouts[row.case_id] = int(elapsed_ms)
             retrieved = list(dict.fromkeys(f"{c.source_id}@{c.version}" for c in answer.citations))
             expected = set(row.expected_sources)
+            records.append(
+                dict(
+                    case_id=row.case_id,
+                    split=row.split,
+                    query=row.query,
+                    expected=sorted(expected),
+                    retrieved=retrieved,
+                    abstained=not retrieved,
+                    latency_ms=elapsed_ms,
+                    timed_out=elapsed_ms > 2000,
+                )
+            )
             if expected:
                 positives += 1
                 hits += len(expected.intersection(retrieved)) / len(expected)
@@ -122,6 +139,8 @@ def evaluate(
         python=platform.python_version(),
         platform=platform.platform(),
         metrics=metrics,
+        timeouts_ms=timeouts,
+        records=records,
     )
 
 
