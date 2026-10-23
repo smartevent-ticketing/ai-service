@@ -20,6 +20,7 @@ from smartevent_ai.domain.knowledge import (
     canonical_json_bytes,
     check_budget,
     require_time,
+    validate_json_depth,
 )
 
 
@@ -190,19 +191,18 @@ def decode_json(data: bytes) -> Any:
             parse_constant=lambda _: (_ for _ in ()).throw(KnowledgeError("Nonfinite JSON")),
         )
 
-        def check(item: Any, depth: int) -> None:
-            if depth > 24:
-                raise KnowledgeError("Excessive JSON depth")
+        def deny_nonfinite(item: Any) -> None:
+            if isinstance(item, float) and not math.isfinite(item):
+                raise KnowledgeError("Nonfinite JSON")
             if isinstance(item, dict):
                 for v in item.values():
-                    check(v, depth + 1)
+                    deny_nonfinite(v)
             elif isinstance(item, list):
                 for v in item:
-                    check(v, depth + 1)
-            elif isinstance(item, float) and not math.isfinite(item):
-                raise KnowledgeError("Nonfinite JSON")
+                    deny_nonfinite(v)
 
-        check(value, 0)
+        deny_nonfinite(value)
+        validate_json_depth(value)
         return value
     except (ValueError, RecursionError, UnicodeError) as exc:
         raise KnowledgeError("Invalid knowledge JSON") from exc

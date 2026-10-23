@@ -105,13 +105,50 @@ async def test_transport_success_is_same_origin_get(monkeypatch: pytest.MonkeyPa
 
 
 @pytest.mark.parametrize(
-    "route", ["/api/v1/../admin", "https://other.org/api/v1/events", "/api/v1//events"]
+    "route",
+    [
+        "/api/v1/../admin",
+        "https://other.org/api/v1/events",
+        "/api/v1//events",
+        "/api/v1/events/create",
+        "/api/v1/payments/vnpay/ipn",
+        "/api/v1/orders/confirm",
+    ],
 )
 @pytest.mark.asyncio
 async def test_transport_rejects_invalid_paths_before_network(route: str) -> None:
     with pytest.raises(ContractViolation):
         await SafeBackendTransport("http://127.0.0.1:8080").get(
             route, query={}, max_bytes=1000, timeout_ms=1000
+        )
+
+
+@pytest.mark.asyncio
+async def test_transport_rejects_deep_json_like_knowledge_contracts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from smartevent_ai.domain.knowledge import MAX_JSON_DEPTH
+
+    assert MAX_JSON_DEPTH == 24
+    deep = b"[" * 30 + b"0" + b"]" * 30
+    assert len(deep) < 1000
+    original = httpx.AsyncClient
+
+    def substitute(*args: Any, **kwargs: Any) -> httpx.AsyncClient:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                content=b'{"success":true,"data":' + deep + b"}",
+                headers={"content-type": "application/json"},
+            )
+
+        kwargs["transport"] = httpx.MockTransport(handler)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(httpx, "AsyncClient", substitute)
+    with pytest.raises(BackendUnavailable):
+        await SafeBackendTransport("http://127.0.0.1:8080").get(
+            "/api/v1/events", query={}, max_bytes=1000, timeout_ms=1000
         )
 
 

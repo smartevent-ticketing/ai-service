@@ -145,6 +145,20 @@ def check_budget(policy: ChunkingPolicy, context_window: int) -> None:
         raise KnowledgeError("Chunk budget exceeds embedding tokenizer context")
 
 
+MAX_JSON_DEPTH = 24
+
+
+def validate_json_depth(value: object, depth: int = 0) -> None:
+    if depth > MAX_JSON_DEPTH:
+        raise KnowledgeError("Excessive JSON depth")
+    if isinstance(value, dict):
+        for child in value.values():
+            validate_json_depth(child, depth + 1)
+    elif isinstance(value, list):
+        for child in value:
+            validate_json_depth(child, depth + 1)
+
+
 @dataclass(frozen=True, slots=True)
 class LoadedDocument:
     source: SourceMetadata

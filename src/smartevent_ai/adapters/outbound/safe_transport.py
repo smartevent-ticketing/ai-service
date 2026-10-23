@@ -12,6 +12,7 @@ import httpx
 
 from smartevent_ai.adapters.outbound.route_policy import is_side_effect_route
 from smartevent_ai.domain.errors import BackendUnavailable, ContractViolation
+from smartevent_ai.domain.knowledge import MAX_JSON_DEPTH
 
 
 class SafeBackendTransport:
@@ -115,6 +116,7 @@ class SafeBackendTransport:
     @staticmethod
     def _validate_json_depth(body: bytes) -> None:
         # Scan structural bytes before decoding; braces inside JSON strings are data.
+        # Bound matches domain MAX_JSON_DEPTH shared with knowledge contracts.
         depth = 0
         quoted = escaped = False
         for char in body:
@@ -129,7 +131,7 @@ class SafeBackendTransport:
                 quoted = True
             elif char in (91, 123):
                 depth += 1
-                if depth > 64:
+                if depth > MAX_JSON_DEPTH:
                     raise BackendUnavailable("Backend JSON exceeds depth limit")
             elif char in (93, 125):
                 depth -= 1
