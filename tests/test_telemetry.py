@@ -5,12 +5,12 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
-from smartevent_ai.adapters.inbound.http_api import create_app
 from smartevent_ai.adapters.inbound.request_telemetry import RequestTelemetry
 
 
-def test_request_logs_only_safe_metadata(caplog: pytest.LogCaptureFixture) -> None:
-    client = TestClient(create_app())
+def test_request_logs_only_safe_metadata(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
     with caplog.at_level(logging.INFO, logger="smartevent_ai.requests"):
         response = client.post(
             "/api/v1/chat",

@@ -1,4 +1,10 @@
-"""Pure read-only ticket recommendation with explicit completeness invariants."""
+"""Pure read-only ticket recommendation with explicit completeness invariants.
+
+EXPLICIT_DEAD: no runtime caller as of 0.2.0. ChatUseCase only calls
+``search_events``; wiring recommend() into a use-case (e.g. ranking after
+search) is future work tracked outside this plan. Do not call it from
+runtime until then; tests/test_unused_tools_locked.py enforces this.
+"""
 
 from dataclasses import dataclass
 from decimal import Decimal
