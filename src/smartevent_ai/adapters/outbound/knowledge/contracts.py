@@ -12,10 +12,13 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from smartevent_ai.domain.knowledge import (
     Audience,
+    ChunkingPolicy,
     KnowledgeChunk,
     KnowledgeError,
     SourceMetadata,
     SourceStatus,
+    canonical_json_bytes,
+    check_budget,
     require_time,
 )
 
@@ -120,10 +123,29 @@ class TokenizerProfile(WireModel):
 class ChunkProfile(WireModel):
     algorithm: Literal["structure-token-v1"]
     normalization: Literal["NFC_LF_v1"]
-    max_tokens: int = Field(strict=True, ge=32, le=4096)
-    overlap_tokens: int = Field(strict=True, ge=0, le=2047)
-    max_chunks: int = Field(strict=True, ge=1, le=10000)
+    max_tokens: int = Field(strict=True)
+    overlap_tokens: int = Field(strict=True)
+    max_chunks: int = Field(strict=True)
     tokenizer: TokenizerProfile
+
+    @classmethod
+    def from_policy(
+        cls,
+        policy: ChunkingPolicy,
+        normalization: Literal["NFC_LF_v1"],
+        tokenizer: TokenizerProfile,
+    ) -> ChunkProfile:
+        if not isinstance(policy, ChunkingPolicy):
+            raise KnowledgeError("Chunk profile requires a domain chunking policy")
+        check_budget(policy, tokenizer.context_window)
+        return cls(
+            algorithm="structure-token-v1",
+            normalization=normalization,
+            max_tokens=policy.max_tokens,
+            overlap_tokens=policy.overlap_tokens,
+            max_chunks=policy.max_chunks,
+            tokenizer=tokenizer,
+        )
 
 
 class DocumentRecord(WireModel):
@@ -211,6 +233,4 @@ def parse_release(data: bytes) -> ReleaseRecord:
 
 
 def canonical_json(value: Any) -> bytes:
-    return (
-        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
-    ).encode()
+    return canonical_json_bytes(value) + b"\n"

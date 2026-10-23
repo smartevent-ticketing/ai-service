@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import re
-from dataclasses import asdict
 from typing import Iterator
 
+from smartevent_ai.adapters.outbound.knowledge.contracts import (
+    ChunkProfile,
+    TokenizerProfile,
+)
 from smartevent_ai.application.knowledge_ports import TokenCounter
 from smartevent_ai.domain.knowledge import (
     ChunkingPolicy,
     KnowledgeChunk,
     KnowledgeError,
     LoadedDocument,
+    check_budget,
     digest,
     fingerprint,
 )
@@ -67,17 +71,16 @@ def _parts(text: str, start: int, end: int) -> Iterator[tuple[int, int, str, boo
 
 class StructureChunker:
     def __init__(self, tokenizer: TokenCounter, policy: ChunkingPolicy = ChunkingPolicy()) -> None:
-        if policy.max_tokens > int(tokenizer.profile["context_window"]):
-            raise KnowledgeError("Chunk budget exceeds embedding tokenizer context")
+        check_budget(policy, int(tokenizer.profile["context_window"]))
         self._tokenizer, self._policy = tokenizer, policy
 
     @property
     def profile(self) -> dict[str, object]:
-        return {
-            **asdict(self._policy),
-            "normalization": "NFC_LF_v1",
-            "tokenizer": self._tokenizer.profile,
-        }
+        return ChunkProfile.from_policy(
+            self._policy,
+            "NFC_LF_v1",
+            TokenizerProfile.model_validate(self._tokenizer.profile),
+        ).model_dump(mode="json")
 
     def split(self, document: LoadedDocument) -> tuple[KnowledgeChunk, ...]:
         text = document.text

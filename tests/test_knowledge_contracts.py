@@ -5,6 +5,9 @@ import pytest
 from knowledge_helpers import NOW, catalog_bytes, source
 
 from smartevent_ai.adapters.outbound.knowledge.contracts import (
+    ChunkProfile,
+    TokenizerProfile,
+    canonical_json,
     decode_json,
     parse_catalog,
     read_bytes,
@@ -14,6 +17,7 @@ from smartevent_ai.domain.knowledge import (
     ChunkingPolicy,
     KnowledgeError,
     SourceStatus,
+    fingerprint,
     require_hash,
 )
 
@@ -99,3 +103,50 @@ def test_bounded_artifact_io(tmp_path) -> None:
     p.write_bytes(b"x" * 10)
     with pytest.raises(KnowledgeError):
         read_bytes(p, 9)
+
+
+def _test_tokenizer_profile() -> TokenizerProfile:
+    return TokenizerProfile(
+        model_id="TEST_ONLY/byte-bpe-vi",
+        revision="fixture-v1",
+        sha256="0" * 64,
+        prefix="",
+        measurement="model_tokens",
+        context_window=512,
+    )
+
+
+def test_chunk_profile_from_policy_round_trip_single_source() -> None:
+    policy = ChunkingPolicy(384, 64)
+    tokenizer = _test_tokenizer_profile()
+    profile = ChunkProfile.from_policy(policy, "NFC_LF_v1", tokenizer)
+    assert profile.max_tokens == 384
+    assert profile.overlap_tokens == 64
+    assert profile.max_chunks == 2000
+    assert profile.algorithm == "structure-token-v1"
+    assert profile.normalization == "NFC_LF_v1"
+    expected = {
+        "max_tokens": 384,
+        "overlap_tokens": 64,
+        "max_chunks": 2000,
+        "algorithm": "structure-token-v1",
+        "normalization": "NFC_LF_v1",
+        "tokenizer": tokenizer.model_dump(mode="json"),
+    }
+    assert fingerprint(profile.model_dump(mode="json")) == fingerprint(expected)
+    assert canonical_json(profile.model_dump(mode="json")).endswith(b"\n")
+
+
+def test_chunk_profile_from_policy_rejects_out_of_bounds() -> None:
+    with pytest.raises(KnowledgeError):
+        ChunkingPolicy(128, 64)
+    small_window = TokenizerProfile(
+        model_id="TEST_ONLY/byte-bpe-vi",
+        revision="fixture-v1",
+        sha256="0" * 64,
+        prefix="",
+        measurement="model_tokens",
+        context_window=64,
+    )
+    with pytest.raises(KnowledgeError):
+        ChunkProfile.from_policy(ChunkingPolicy(384, 64), "NFC_LF_v1", small_window)

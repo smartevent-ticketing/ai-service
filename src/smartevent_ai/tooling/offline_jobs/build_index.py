@@ -50,12 +50,14 @@ def build_index(
             raise KnowledgeError("Production build requires current approved public sources")
     loader = LocalDocumentLoader(corpus_root)
     sources = tuple((s.path, s.metadata.to_domain()) for s in catalog.sources)
-    chunks = IngestKnowledge(loader, chunker).build(sources)
+    chunks, documents_by_key = IngestKnowledge(loader, chunker).build_with_documents(sources)
+    ordered = sorted(sources, key=lambda s: (s[1].source_id, s[1].version))
     documents = [
         DocumentRecord(
-            source=SourceRecord.model_validate(asdict(source)), text=loader.load(path, source).text
+            source=SourceRecord.model_validate(asdict(source)),
+            text=documents_by_key[source.source_id, source.version, source.content_sha256].text,
         )
-        for path, source in sorted(sources, key=lambda s: (s[1].source_id, s[1].version))
+        for _, source in ordered
     ]
     chunk_records = [
         {**asdict(c), "chunk_id": c.chunk_id, "chunk_sha256": c.chunk_sha256} for c in chunks
