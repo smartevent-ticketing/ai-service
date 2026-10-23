@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Protocol
 
 from smartevent_ai.adapters.outbound.knowledge.contracts import (
+    ChunkProfile,
     parse_catalog,
     parse_release,
 )
@@ -16,6 +17,7 @@ from smartevent_ai.domain.knowledge import (
     KnowledgeError,
     KnowledgeSnapshot,
     LoadedDocument,
+    check_budget,
     digest,
     fingerprint,
     require_time,
@@ -58,13 +60,14 @@ class ArtifactKnowledgeStore:
             or any(s.metadata.approval_id.startswith("TEST_ONLY") for s in catalog.sources)
         ):
             raise KnowledgeError("Synthetic fixtures cannot be promoted to production")
-        profile = release.profile.model_dump(mode="json")
         policy = ChunkingPolicy(
             release.profile.max_tokens, release.profile.overlap_tokens, release.profile.max_chunks
         )
-        if policy.max_tokens > release.profile.tokenizer.context_window:
-            raise KnowledgeError("Release tokenizer budget exceeds context")
-        profile_hash = fingerprint(profile)
+        check_budget(policy, release.profile.tokenizer.context_window)
+        expected_profile = ChunkProfile.from_policy(
+            policy, release.profile.normalization, release.profile.tokenizer
+        )
+        profile_hash = fingerprint(expected_profile.model_dump(mode="json"))
         current = {
             (s.metadata.source_id, s.metadata.version): s.metadata.to_domain()
             for s in catalog.sources

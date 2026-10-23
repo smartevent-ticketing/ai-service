@@ -10,7 +10,7 @@ from smartevent_ai.adapters.outbound.knowledge.contracts import canonical_json
 from smartevent_ai.adapters.outbound.knowledge.lexical_reader import BM25Retriever
 from smartevent_ai.application.retrieve_policy import RetrievePolicy
 from smartevent_ai.domain.knowledge import KnowledgeError, SourceStatus, digest
-from smartevent_ai.tooling.knowledge.evaluate import FrozenArtifacts, FrozenClock, evaluate
+from smartevent_ai.tooling.offline_jobs.evaluate import FrozenArtifacts, FrozenClock, evaluate
 
 
 class MemoryStore:

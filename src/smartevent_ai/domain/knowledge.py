@@ -32,10 +32,12 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def canonical_json_bytes(value: object) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+
+
 def fingerprint(value: object) -> str:
-    return digest(
-        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
-    )
+    return digest(canonical_json_bytes(value))
 
 
 def require_hash(value: str) -> None:
@@ -136,6 +138,25 @@ class ChunkingPolicy:
             or self.algorithm != "structure-token-v1"
         ):
             raise KnowledgeError("Invalid chunking policy")
+
+
+def check_budget(policy: ChunkingPolicy, context_window: int) -> None:
+    if policy.max_tokens > context_window:
+        raise KnowledgeError("Chunk budget exceeds embedding tokenizer context")
+
+
+MAX_JSON_DEPTH = 24
+
+
+def validate_json_depth(value: object, depth: int = 0) -> None:
+    if depth > MAX_JSON_DEPTH:
+        raise KnowledgeError("Excessive JSON depth")
+    if isinstance(value, dict):
+        for child in value.values():
+            validate_json_depth(child, depth + 1)
+    elif isinstance(value, list):
+        for child in value:
+            validate_json_depth(child, depth + 1)
 
 
 @dataclass(frozen=True, slots=True)

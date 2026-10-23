@@ -13,7 +13,6 @@ from smartevent_ai.adapters.inbound.request_telemetry import RequestTelemetry
 from smartevent_ai.application.models import ChatCommand, ChatResult
 from smartevent_ai.domain.dialogue import DialogueState, Intent, Scope
 from smartevent_ai.domain.errors import SmartEventError
-from smartevent_ai.infrastructure.bootstrap import build_chat
 from smartevent_ai.infrastructure.settings import Settings
 
 
@@ -139,6 +138,8 @@ class ChatResponseDTO(BaseModel):
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
+    from smartevent_ai.infrastructure.bootstrap import build_chat
+
     configuration = settings or Settings()
     chat, gateway = build_chat(configuration)
     app = FastAPI(title="SmartEvent AI Read-only Service", version=__version__)
@@ -174,6 +175,3 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     return app
-
-
-app = create_app()

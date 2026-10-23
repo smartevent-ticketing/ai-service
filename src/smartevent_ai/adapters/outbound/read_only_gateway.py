@@ -20,6 +20,13 @@ _ROUTE_TEMPLATE = re.compile(
 )
 _ROUTE_CONCRETE = re.compile(r"^/api/v1/[A-Za-z0-9_./-]+$")
 
+_PUBLISHED_EVENT_TOOLS = ("search_events", "get_event_details")
+
+
+def _require_published(tool_name: str, status: object) -> None:
+    if tool_name in _PUBLISHED_EVENT_TOOLS and status != "PUBLISHED":
+        raise ContractViolation("Unpublished event must never reach model")
+
 
 class ReadTransport(Protocol):
     async def get(
@@ -298,11 +305,7 @@ class ReadOnlyToolGateway:
             if value is not None:
                 projected[alias] = value
 
-        if (
-            tool["name"] in ("search_events", "get_event_details")
-            and row.get("status") != "PUBLISHED"
-        ):
-            raise ContractViolation("Unpublished event must never reach model")
+        _require_published(tool["name"], row.get("status"))
 
         errors = list(
             Draft202012Validator(
@@ -389,10 +392,11 @@ class ReadOnlyToolGateway:
                 and item.get("status") != "AVAILABLE"
             )
         ]
-        if tool["name"] == "search_events" and any(
-            not isinstance(item, dict) or item.get("status") != "PUBLISHED" for item in filtered
-        ):
-            raise ContractViolation("Unpublished event returned by search")
+        if tool["name"] == "search_events":
+            for item in filtered:
+                _require_published(
+                    tool["name"], item.get("status") if isinstance(item, dict) else None
+                )
 
         rows = [self._project_row(tool, item) for item in filtered[:limit]]
         capped = len(filtered) > limit

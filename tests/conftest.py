@@ -1,10 +1,24 @@
+"""Shared fixtures: canonical copy lives in tests/support/conftest.py.
+
+This file mirrors it so historical ``from conftest import ...`` statements
+keep working during the 1-release shim period.
+"""
+
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
+from fastapi.testclient import TestClient
+
+from smartevent_ai.adapters.inbound.http_api import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture
+def client() -> TestClient:
+    return TestClient(create_app())
 
 
 class SpyTransport:

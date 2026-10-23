@@ -9,3 +9,7 @@
 {"case_id":"inventory-test","group":"guide-inventory","split":"test","query":"toàn bộ tồn kho backend","expected_sources":["TEST-GUIDE@1.0.0"]}
 {"case_id":"negative-test","group":"weather-test","split":"test","query":"dự báo khí tượng thủy văn","expected_sources":[]}
 {"case_id":"out-of-scope-test","group":"software-test","split":"test","query":"biên dịch javascript rust","expected_sources":[]}
+{"case_id":"negation-dev","group":"negation-dev","split":"dev","query":"trường hợp nào không được hoàn tiền?","expected_sources":["TEST-REFUND@1.0.0"]}
+{"case_id":"near-empty-dev","group":"near-empty-dev","split":"dev","query":"...","expected_sources":[]}
+{"case_id":"negation-test","group":"negation-test","split":"test","query":"vé nào không đủ điều kiện hoàn?","expected_sources":["TEST-REFUND@1.0.0"]}
+{"case_id":"near-empty-test","group":"near-empty-test","split":"test","query":"tôi muốn hỏi","expected_sources":[]}

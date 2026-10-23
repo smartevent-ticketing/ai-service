@@ -8,7 +8,7 @@ from onnx import TensorProto, helper
 
 from smartevent_ai.adapters.outbound.knowledge.embedding_adapter import LocalOnnxEmbeddings
 from smartevent_ai.domain.knowledge import KnowledgeError, digest
-from smartevent_ai.tooling.knowledge.benchmark_semantic import benchmark
+from smartevent_ai.tooling.offline_jobs.benchmark_semantic import benchmark
 
 
 def tiny_model(path: Path) -> Path:
@@ -91,6 +91,26 @@ def test_dense_and_hybrid_benchmark_is_offline_and_filters_private_chunks(tmp_pa
     assert all(
         "TEST-STAFF@1.0.0" not in r for row in result["results"] for r in row["rankings"].values()
     )
+
+
+def test_offline_jobs_rename_both_paths() -> None:
+    import smartevent_ai.tooling.knowledge.benchmark_semantic as old_benchmark
+    import smartevent_ai.tooling.knowledge.build_index as old_build
+    import smartevent_ai.tooling.knowledge.evaluate as old_evaluate
+    import smartevent_ai.tooling.knowledge.publish as old_publish
+    import smartevent_ai.tooling.offline_jobs.benchmark_semantic as new_benchmark
+    import smartevent_ai.tooling.offline_jobs.build_index as new_build
+    import smartevent_ai.tooling.offline_jobs.evaluate as new_evaluate
+    import smartevent_ai.tooling.offline_jobs.publish as new_publish
+
+    assert old_build.build_index is new_build.build_index
+    assert old_build.main is new_build.main
+    assert old_evaluate.evaluate is new_evaluate.evaluate
+    assert old_evaluate.main is new_evaluate.main
+    assert old_publish.publish is new_publish.publish
+    assert old_publish.main is new_publish.main
+    assert old_benchmark.benchmark is new_benchmark.benchmark
+    assert old_benchmark.main is new_benchmark.main
 
 
 def test_offline_cli_entrypoints(tmp_path, monkeypatch, capsys) -> None:

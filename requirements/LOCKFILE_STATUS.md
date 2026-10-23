@@ -15,9 +15,12 @@ uv export --quiet --frozen --no-header --no-emit-project --format requirements-t
 uv export --quiet --frozen --no-header --no-dev --extra rag-ingest --extra rag-semantic --no-emit-project --format requirements-txt --output-file requirements/rag.lock
 ```
 
-`requirements/dev.txt` remains a direct-tool convenience list; the hash exports
-are the installation input for verification and release. Dependency changes must
-regenerate uv.lock and all three hash exports, pass consistency/type/tests/wheel checks and
+`requirements/dev.txt` is generated from the `dev` dependency group and the
+hashed `dev.lock` export — do not edit it by hand. Regenerate with
+`python scripts/export_dev_tools.py --write` (verify with `--check`). The hash
+exports remain the installation input for verification and release. Dependency
+changes must regenerate uv.lock and all three hash exports, pass
+consistency/type/tests/wheel checks and
 run `pip-audit --no-deps --disable-pip -r requirements/runtime.lock`.
 
 The graph supports the Python range in pyproject; execution evidence for each

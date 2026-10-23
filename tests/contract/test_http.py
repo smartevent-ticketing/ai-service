@@ -2,19 +2,17 @@ from fastapi.testclient import TestClient
 
 from smartevent_ai.adapters.inbound.http_api import create_app
 
-client = TestClient(create_app())
 
-
-def test_liveness() -> None:
+def test_liveness(client: TestClient) -> None:
     assert client.get("/health/live").json() == {"status": "alive"}
 
 
-def test_not_fake_ready() -> None:
+def test_not_fake_ready(client: TestClient) -> None:
     body = client.get("/health/ready").json()
     assert body["status"] == "degraded" and body["business_tools_enabled"] == []
 
 
-def test_nlu_chat_no_unverified_business_data() -> None:
+def test_nlu_chat_no_unverified_business_data(client: TestClient) -> None:
     response = client.post("/api/v1/chat", json={"message": "Tìm 2 vé concert ở Hà Nội"})
     assert response.status_code == 200
     data = response.json()
@@ -26,7 +24,7 @@ def test_nlu_chat_no_unverified_business_data() -> None:
     assert "Chưa thể xác minh" in data["answer"]
 
 
-def test_second_turn_stateless_merge() -> None:
+def test_second_turn_stateless_merge(client: TestClient) -> None:
     r1 = client.post("/api/v1/chat", json={"message": "3 vé dưới 1 triệu tổng"}).json()
     r2 = client.post(
         "/api/v1/chat",
@@ -41,7 +39,7 @@ def test_second_turn_stateless_merge() -> None:
     assert r2["conversation_id"] == r1["conversation_id"]
 
 
-def test_budget_scope_followup_resolves_without_losing_state() -> None:
+def test_budget_scope_followup_resolves_without_losing_state(client: TestClient) -> None:
     r1 = client.post("/api/v1/chat", json={"message": "3 vé dưới 800 nghìn"}).json()
     assert "mỗi vé hay tổng" in r1["answer"]
     r2 = client.post(
@@ -58,25 +56,25 @@ def test_budget_scope_followup_resolves_without_losing_state() -> None:
     assert data["state"]["budget_amount"] == 800_000
 
 
-def test_large_budget_never_becomes_server_error() -> None:
+def test_large_budget_never_becomes_server_error(client: TestClient) -> None:
     response = client.post("/api/v1/chat", json={"message": "3 vé dưới 2000 triệu tổng"})
     assert response.status_code == 200
     assert "ngoài phạm vi" in response.json()["answer"]
 
 
-def test_user_mutation_request_only_guides() -> None:
+def test_user_mutation_request_only_guides(client: TestClient) -> None:
     result = client.post("/api/v1/chat", json={"message": "Giữ vé giúp tôi"}).json()
     assert result["intent"] == "BOOKING_GUIDANCE"
     assert "không giữ" in result["answer"]
 
 
-def test_no_business_mutation_http_routes() -> None:
+def test_no_business_mutation_http_routes(client: TestClient) -> None:
     for endpoint in ("/api/v1/reservations", "/api/v1/orders", "/api/v1/payments/create-url"):
         assert client.post(endpoint, json={}).status_code == 404
     assert client.get("/api/v1/tools/search_events").status_code == 404
 
 
-def test_rejects_unexpected_state_and_too_long_message() -> None:
+def test_rejects_unexpected_state_and_too_long_message(client: TestClient) -> None:
     assert (
         client.post(
             "/api/v1/chat", json={"message": "hello", "previous_state": {"isAdmin": True}}
@@ -100,7 +98,9 @@ def test_packaged_entrypoint_imports() -> None:
     assert app.title == "SmartEvent AI Read-only Service"
 
 
-def test_whitespace_only_inputs_are_validation_errors_not_server_errors() -> None:
+def test_whitespace_only_inputs_are_validation_errors_not_server_errors(
+    client: TestClient,
+) -> None:
     assert client.post("/api/v1/chat", json={"message": "   "}).status_code == 422
     response = client.post(
         "/api/v1/chat",

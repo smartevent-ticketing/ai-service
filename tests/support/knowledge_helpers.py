@@ -17,10 +17,10 @@ from smartevent_ai.domain.knowledge import (
     digest,
 )
 from smartevent_ai.infrastructure.knowledge_config import RagConfig
-from smartevent_ai.tooling.knowledge.build_index import build_index
-from smartevent_ai.tooling.knowledge.evaluate import FrozenArtifacts
+from smartevent_ai.tooling.offline_jobs.build_index import build_index
+from smartevent_ai.tooling.offline_jobs.evaluate import FrozenArtifacts
 
-FIXTURES = Path(__file__).parent / "fixtures/rag"
+FIXTURES = Path(__file__).resolve().parents[1] / "fixtures/rag"
 NOW = datetime.now(UTC).replace(microsecond=0)
 
 
@@ -110,7 +110,7 @@ def make_bundle(tmp_path: Path, max_tokens=128, overlap=16):
 def configure(tmp_path: Path, catalog: Path, output: Path, manifest):
     root = tmp_path / "config"
     root.mkdir(exist_ok=True)
-    repository = Path(__file__).resolve().parents[1]
+    repository = Path(__file__).resolve().parents[2]
     for name in ("runtime_tool_registry.yaml", "implementation_gates.yaml"):
         (root / name).write_bytes((repository / "configs" / name).read_bytes())
     gates = yaml.safe_load((root / "implementation_gates.yaml").read_text())

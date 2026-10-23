@@ -72,6 +72,9 @@ class ChatUseCase:
     ) -> ChatResult:
         criteria = EventSearchCriteria.from_state(state)
         try:
+            # Explicit single business-tool call. The other 13 registry tools,
+            # pure_operations (retrieve_policy, optimize_ticket_selection) and
+            # ui_actions have no runtime caller; see test_unused_tools_locked.py.
             result = await self._tools.execute("search_events", criteria.as_tool_arguments())
         except SmartEventError:
             return ChatResult(

@@ -30,7 +30,7 @@ python scripts/knowledge_smoke.py --output artifacts/knowledge-demo
 CLI không tự tải tokenizer/model và không suy ra phê duyệt từ nội dung:
 
 ```bash
-python -m smartevent_ai.tooling.knowledge.build_index --help
+python -m smartevent_ai.tooling.offline_jobs.build_index --help
 ```
 
 Các tham số bắt buộc gồm `--corpus-root`, `--catalog`, `--catalog-sha256`,
@@ -46,8 +46,8 @@ bị từ chối thay vì cắt âm thầm. Giới hạn loader Markdown/TXT là
 ## Đánh giá
 
 ```bash
-python -m smartevent_ai.tooling.knowledge.evaluate --help
-python -m smartevent_ai.tooling.knowledge.benchmark_semantic --help
+python -m smartevent_ai.tooling.offline_jobs.evaluate --help
+python -m smartevent_ai.tooling.offline_jobs.benchmark_semantic --help
 ```
 
 Evaluation nhận catalog/release cùng checksum, tập câu hỏi JSONL theo schema riêng,
@@ -67,10 +67,34 @@ production; dense chưa có ngưỡng abstention đã hiệu chuẩn.
 Không tải model trong CI mặc định. Kiểm thử ONNX dùng graph tổng hợp tự tạo;
 benchmark model đa ngôn ngữ thật là bằng chứng riêng được lưu dưới `evidence/`.
 
+## Hiệu chuẩn offline (không bao giờ bật tool)
+
+```bash
+python -m smartevent_ai.tooling.offline_jobs.analyze_evaluation --input artifacts/evaluation.json
+```
+
+`evaluate.py` ghi `records` từng case (case_id/split/query/expected/retrieved/
+abstained/latency_ms/timed_out) kèm `timeouts_ms` cho case vượt 2000 ms.
+`analyze_evaluation` đọc records và in báo cáo hiệu chuẩn (Brier/ECE theo
+abstention-as-confidence: abstained 0.1, answered 0.9; latency p50/p95) với
+nhãn `OFFLINE_ONLY`. Input hỏng (thiếu field, trùng case, group leak
+dev/test) cho `evaluation_ready=false`, không in metric nửa vời. Ngưỡng hiệu
+chuẩn chỉ phục vụ tuning offline; không có code path nào đọc báo cáo để bật
+tool (`SPEC_TEST_ONLY`/`BLOCKED`/`NOT_RUN` không phải `PASS`).
+
+## Verdicts bằng chứng (kept/conflicts/dropped)
+
+`domain/evidence.py` (stdlib-only) phân loại mỗi chunk sau BM25-rank, theo đúng
+thứ tự: injection → premise-contradiction → relevance (< 0.5 query-term
+coverage) → evidence. `CONFLICTS` được giữ làm undercutting evidence có
+citation (đánh dấu `[BẰNG CHỨNG PHẢN BIỆN — cần đối chiếu]`), không lọc âm
+thầm; check crash/timeout → `DROPPED`. Judge fail toàn bộ → fallback BM25
+thuần, không fail-closed request.
+
 ## Publish và rollback
 
 ```bash
-python -m smartevent_ai.tooling.knowledge.publish artifacts/knowledge-demo/build artifacts/published
+python -m smartevent_ai.tooling.offline_jobs.publish artifacts/knowledge-demo/build artifacts/published
 ```
 
 Publisher kiểm checksum rồi tạo thư mục bất biến theo release hash và thay

@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Any, Protocol
 
+from smartevent_ai.domain.evidence import EvidenceVerdict
 from smartevent_ai.domain.knowledge import (
     KnowledgeChunk,
     KnowledgeSnapshot,
@@ -42,6 +43,12 @@ class EvidenceRetriever(Protocol):
     def rank(
         self, query: str, chunks: tuple[KnowledgeChunk, ...], limit: int
     ) -> tuple[KnowledgeChunk, ...]: ...
+
+
+class EvidenceJudge(Protocol):
+    def judge(
+        self, query: str, chunks: tuple[KnowledgeChunk, ...]
+    ) -> tuple[tuple[KnowledgeChunk, EvidenceVerdict], ...]: ...
 
 
 class PolicyReader(Protocol):

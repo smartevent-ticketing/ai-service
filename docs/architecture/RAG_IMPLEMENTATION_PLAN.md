@@ -66,7 +66,7 @@ Ghi artifact/index thuộc pipeline tri thức riêng, không phải quyền ghi
 | Trách nhiệm trong ảnh | Vị trí phù hợp trong dự án |
 | :--- | :--- |
 | `config/` | `configs/` và `infrastructure/`; YAML/Pydantic không đi vào domain |
-| `ingestion/`, `loaders/` | Loader ở adapter; CLI và công việc ghi artifact ở `tooling/knowledge/` |
+| `ingestion/`, `loaders/` | Loader ở adapter; CLI và công việc ghi artifact ở `tooling/offline_jobs/` |
 | `chunking/`, `splitters/` | Policy/bất biến ở domain, điều phối ở application, tokenizer/splitter thư viện ở adapter |
 | `embeddings/` | Port của application; implementation ở `adapters/outbound/knowledge/` |
 | `vectordb/`, `vectorstore/` | Adapter đọc index ở runtime; writer nằm trong pipeline offline |
@@ -79,7 +79,9 @@ Cây tệp dự kiến; tên có thể tinh chỉnh trong PR đầu, giữ nguy�
 
 ```text
 src/smartevent_ai/
-├── domain/knowledge.py                    # PolicyDocument, Chunk, Citation, Evidence
+├── domain/
+│   ├── knowledge.py                      # PolicyDocument, Chunk, Citation, Evidence
+│   └── evidence.py                       # Verdicts kept/conflicts/dropped (stdlib-only)
 ├── application/
 │   ├── knowledge_ports.py                # Các Protocol cho loader/tokenizer/index/clock
 │   ├── ingest_knowledge.py               # Use case ingest, chỉ CLI gọi
@@ -92,9 +94,10 @@ src/smartevent_ai/
 │   ├── vector_reader.py                  # Tùy chọn, chỉ đọc khi runtime
 │   └── answer_adapter.py                 # Trích đoạn; generation là bước sau
 ├── infrastructure/knowledge_config.py     # Đọc/validate cấu hình và wiring
-└── tooling/knowledge/
+└── tooling/offline_jobs/
     ├── build_index.py                    # CLI ingest/build, không expose qua HTTP
-    └── evaluate.py                       # Đánh giá corpus/retrieval/citation
+    ├── evaluate.py                       # Đánh giá corpus/retrieval/citation (+records/timeouts)
+    └── analyze_evaluation.py             # Hiệu chuẩn offline (OFFLINE_ONLY, không bật tool)
 configs/
 ├── rag.yaml                              # Mặc định disabled; giới hạn và profile
 └── schemas/
@@ -102,11 +105,11 @@ configs/
     └── rag_evaluation.schema.json
 tests/
 ├── fixtures/rag/                          # Nguồn và câu hỏi tổng hợp TEST_ONLY
-├── test_knowledge_contracts.py
-├── test_knowledge_chunking.py
-├── test_knowledge_ingestion.py
-├── test_policy_retrieval.py
-└── test_policy_chat.py
+├── unit/                                  # chat, domain, nlu, split, settings
+├── contract/                              # http, gateway, transport, knowledge_*, policy_*,
+│                                          # test_evidence_verdicts, test_evaluation_analysis, ...
+├── security/                              # distribution, unused_tools_locked, no_import_side_effects
+└── support/                               # conftest fixtures, knowledge_helpers
 ```
 
 Không tạo thư mục rỗng hoặc skeleton cho provider chưa dùng. `domain` vẫn chỉ dùng standard library; application chỉ dùng domain/port. Các thư viện LangChain, tokenizer, PDF parser, embedding và vector client thuộc adapter/tooling.
@@ -151,7 +154,7 @@ Tài liệu [LangChain về recursive splitting](https://docs.langchain.com/oss/
 | PR | Phạm vi | Tệp/chạm chính | Điều kiện hoàn thành |
 | :--- | :--- | :--- | :--- |
 | 1 — Hợp đồng RAG | ADR đề xuất, source/chunk/citation models, các port, config disabled, schema runtime | `domain/knowledge.py`, `application/knowledge_ports.py`, `configs/rag.yaml`, schemas, resource fallback, settings/bootstrap | Domain/application không import thư viện ngoài; negative tests cho manifest/quyền/thời hiệu; default vẫn tắt |
-| 2 — Ingest và chunking | Loader Markdown/TXT, chuẩn hóa, chia cấu trúc/token, CLI xuất chunks JSONL + build manifest | Loader/chunker adapter, `application/ingest_knowledge.py`, `tooling/knowledge/build_index.py`, fixtures | Có demo offline chia tài liệu dài; chunk có provenance; kiểm tra ranh giới token bằng tokenizer pin; hash tái lập Windows/Linux; không mất điều kiện/ngoại lệ |
+| 2 — Ingest và chunking | Loader Markdown/TXT, chuẩn hóa, chia cấu trúc/token, CLI xuất chunks JSONL + build manifest | Loader/chunker adapter, `application/ingest_knowledge.py`, `tooling/offline_jobs/build_index.py`, fixtures | Có demo offline chia tài liệu dài; chunk có provenance; kiểm tra ranh giới token bằng tokenizer pin; hash tái lập Windows/Linux; không mất điều kiện/ngoại lệ |
 | 3 — Retrieval baseline | Index lexical, filter trước retrieval, kiểm tra catalog/thu hồi, citation, đánh giá offline | `lexical_reader.py`, `application/retrieve_policy.py`, evaluator và bộ câu hỏi riêng | Truy xuất được fixture có nguồn; không leak audience/nguồn thu hồi/hết hạn; no-evidence và conflict trả fallback; chưa nối public chat |
 | 4 — Benchmark semantic | Thử embedding và dense/hybrid so với baseline; chỉ thêm vector service nếu có cơ sở | Adapter embedding/vector nếu được chọn, optional dependencies, lockfile, manifest profile | Có số liệu chất lượng/latency/RAM trên máy đích; pin weights/tokenizer/checksum; kiểm thử thật adapter được chọn; dependency audit không bỏ sót nhóm RAG |
 | 5 — Tích hợp chat | Nhánh `REFUND_POLICY`, grounding/citations, readiness từng thành phần, cấu hình gate | `chat.py`, `models.py`, `dialogue.py`, `http_api.py`, `bootstrap.py`, response composer, tests | Default vẫn hành vi cũ; có gate/corpus hợp lệ mới trả nguồn; lỗi RAG fallback an toàn; không tác động business gateway hoặc quyền dữ liệu riêng tư |
