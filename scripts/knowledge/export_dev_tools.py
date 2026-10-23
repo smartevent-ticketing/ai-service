@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_LOCK = ROOT / "requirements/dev.lock"
 DEFAULT_OUTPUT = ROOT / "requirements/dev.txt"
 HEADER = "# Direct tool dependencies pinned. Runtime packages pinned in pyproject.toml."

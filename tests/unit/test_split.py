@@ -5,7 +5,7 @@ import pytest
 
 from smartevent_ai.tooling.dataset_split import split_dataset
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = ROOT / "docs/contexts/v1.2/schemas/training_sample.schema.json"
 
 

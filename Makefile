@@ -8,7 +8,7 @@ compile:
 	python -m compileall -q src scripts tests
 
 static:
-	python scripts/static_verify.py
+	python scripts/verify/static_verify.py
 
 lint:
 	ruff check src tests scripts
@@ -20,23 +20,23 @@ test:
 	pytest -q --cov=smartevent_ai --cov-report=term-missing --cov-fail-under=90
 
 contexts:
-	python scripts/verify_contexts.py
+	python scripts/verify/verify_contexts.py
 
 configs:
-	python scripts/verify_runtime_config_sync.py
-	python scripts/export_knowledge_schemas.py --verify
+	python scripts/verify/verify_runtime_config_sync.py
+	python scripts/knowledge/export_knowledge_schemas.py --verify
 
 knowledge-smoke:
-	python scripts/knowledge_smoke.py --output artifacts/knowledge-smoke
+	python scripts/knowledge/knowledge_smoke.py --output artifacts/knowledge-smoke
 
 manifest:
-	python scripts/source_manifest.py --verify
+	python scripts/verify/source_manifest.py --verify
 
 package:
 	python -m pip wheel --no-deps --no-build-isolation . -w dist/wheel
 
 wheel-smoke: package
-	python scripts/wheel_smoke.py dist/wheel
+	python scripts/release/wheel_smoke.py dist/wheel
 
 check: compile static configs lint typecheck test contexts manifest wheel-smoke
 

@@ -7,7 +7,7 @@ import hashlib
 import shutil
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SOURCE = ROOT / "configs"
 DEFAULT_PACKAGE = ROOT / "src/smartevent_ai/resources"
 TRACKED_SUFFIXES = (".yaml", ".json")

@@ -40,15 +40,15 @@ jobs:
       - name: Dependency consistency
         run: python -m pip check
       - name: Dependency lock integrity
-        run: python scripts/verify_dependency_locks.py
+        run: python scripts/verify/verify_dependency_locks.py
       - name: Compile sources
         run: python -m compileall -q src scripts tests
       - name: Clean Architecture + read-only static guard
-        run: python scripts/static_verify.py
+        run: python scripts/verify/static_verify.py
       - name: Runtime config source/package integrity
-        run: python scripts/verify_runtime_config_sync.py
+        run: python scripts/verify/verify_runtime_config_sync.py
       - name: Knowledge schema contract integrity
-        run: python scripts/export_knowledge_schemas.py --verify
+        run: python scripts/knowledge/export_knowledge_schemas.py --verify
       - name: Ruff lint
         run: ruff check src tests scripts
       - name: Formatting
@@ -58,21 +58,21 @@ jobs:
       - name: Unit + contract + security regression
         run: pytest -q --cov=smartevent_ai --cov-report=term-missing --cov-fail-under=90
       - name: Historical v1.2 context integrity
-        run: python scripts/verify_contexts.py
+        run: python scripts/verify/verify_contexts.py
       - name: Offline TEST_ONLY knowledge smoke
-        run: python scripts/knowledge_smoke.py --output artifacts/knowledge-ci
+        run: python scripts/knowledge/knowledge_smoke.py --output artifacts/knowledge-ci
       - name: Historical reference contracts (not live integration)
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -m pytest -q docs/contexts/v1.2/tests
       - name: Source artifact manifest
-        run: python scripts/source_manifest.py --verify
+        run: python scripts/verify/source_manifest.py --verify
       - name: Build wheel
         run: python -m pip wheel --no-deps --no-build-isolation . -w dist
       - name: Clean-directory wheel smoke test
         env:
           PYTHONPATH: ${{ github.workspace }}/src
-        run: python scripts/wheel_smoke.py dist
+        run: python scripts/release/wheel_smoke.py dist
       - name: Upload wheel
         uses: actions/upload-artifact@v4
         with:

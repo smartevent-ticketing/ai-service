@@ -1,3 +1,9 @@
+"""Shared fixtures: canonical copy lives in tests/support/conftest.py.
+
+This file mirrors it so historical ``from conftest import ...`` statements
+keep working during the 1-release shim period.
+"""
+
 from pathlib import Path
 from typing import Any
 

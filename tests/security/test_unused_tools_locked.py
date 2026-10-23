@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 # Registry pure_operations/ui_actions that are contracts only, not runtime calls.
 CONTRACT_ONLY = {

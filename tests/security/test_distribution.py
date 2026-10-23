@@ -8,11 +8,18 @@ from types import ModuleType
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
+
+
+_SCRIPT_PACKAGES = ("verify", "knowledge", "release")
 
 
 def load_script(name: str) -> ModuleType:
-    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / f"{name}.py")
+    candidates = [ROOT / "scripts" / package / f"{name}.py" for package in _SCRIPT_PACKAGES]
+    candidates.append(ROOT / "scripts" / f"{name}.py")
+    path = next((c for c in candidates if c.is_file()), None)
+    assert path is not None, f"script not found: {name}"
+    spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
