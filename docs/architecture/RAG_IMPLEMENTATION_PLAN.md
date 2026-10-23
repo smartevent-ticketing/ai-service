@@ -79,7 +79,9 @@ Cây tệp dự kiến; tên có thể tinh chỉnh trong PR đầu, giữ nguy�
 
 ```text
 src/smartevent_ai/
-├── domain/knowledge.py                    # PolicyDocument, Chunk, Citation, Evidence
+├── domain/
+│   ├── knowledge.py                      # PolicyDocument, Chunk, Citation, Evidence
+│   └── evidence.py                       # Verdicts kept/conflicts/dropped (stdlib-only)
 ├── application/
 │   ├── knowledge_ports.py                # Các Protocol cho loader/tokenizer/index/clock
 │   ├── ingest_knowledge.py               # Use case ingest, chỉ CLI gọi
@@ -94,7 +96,8 @@ src/smartevent_ai/
 ├── infrastructure/knowledge_config.py     # Đọc/validate cấu hình và wiring
 └── tooling/offline_jobs/
     ├── build_index.py                    # CLI ingest/build, không expose qua HTTP
-    └── evaluate.py                       # Đánh giá corpus/retrieval/citation
+    ├── evaluate.py                       # Đánh giá corpus/retrieval/citation (+records/timeouts)
+    └── analyze_evaluation.py             # Hiệu chuẩn offline (OFFLINE_ONLY, không bật tool)
 configs/
 ├── rag.yaml                              # Mặc định disabled; giới hạn và profile
 └── schemas/
@@ -102,11 +105,11 @@ configs/
     └── rag_evaluation.schema.json
 tests/
 ├── fixtures/rag/                          # Nguồn và câu hỏi tổng hợp TEST_ONLY
-├── test_knowledge_contracts.py
-├── test_knowledge_chunking.py
-├── test_knowledge_ingestion.py
-├── test_policy_retrieval.py
-└── test_policy_chat.py
+├── unit/                                  # chat, domain, nlu, split, settings
+├── contract/                              # http, gateway, transport, knowledge_*, policy_*,
+│                                          # test_evidence_verdicts, test_evaluation_analysis, ...
+├── security/                              # distribution, unused_tools_locked, no_import_side_effects
+└── support/                               # conftest fixtures, knowledge_helpers
 ```
 
 Không tạo thư mục rỗng hoặc skeleton cho provider chưa dùng. `domain` vẫn chỉ dùng standard library; application chỉ dùng domain/port. Các thư viện LangChain, tokenizer, PDF parser, embedding và vector client thuộc adapter/tooling.

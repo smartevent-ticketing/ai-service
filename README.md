@@ -262,7 +262,9 @@ Hai công việc chia dữ liệu được tách riêng: `dataset_split.py` chia
 
 **Pipeline offline:** kiểm tra catalog → đọc Markdown/TXT dưới corpus root → chuẩn hóa NFC/LF → chia heading/đoạn/bảng với tokenizer đã pin → xuất `release.json`, `chunks.jsonl` và build manifest → đánh giá → publish artifact bất biến. Profile khởi điểm là **384 token, overlap tối đa 64 token**, tính cả prefix/heading; cần benchmark trước khi coi là phù hợp với corpus thật.
 
-**Luồng chat:** lọc nguồn công khai đã duyệt/còn hiệu lực → BM25 → kiểm tra lại catalog → lấy nguyên phần cha chứa bằng chứng → trả trích đoạn với citation. Nếu phần nguồn đầy đủ vượt giới hạn phản hồi, dịch vụ không cắt bỏ điều kiện/ngoại lệ để tạo câu trả lời. Không có LLM tự sinh điều khoản.
+**Luồng chat:** lọc nguồn công khai đã duyệt/còn hiệu lực → BM25 → phân loại bằng chứng (kept/conflicts/dropped: injection và premise-contradiction bị loại hoặc giữ làm bằng chứng phản biện có đánh dấu, query off-topic/thiếu evidence bị loại) → kiểm tra lại catalog → lấy nguyên phần cha chứa bằng chứng → trả trích đoạn với citation. Nếu phần nguồn đầy đủ vượt giới hạn phản hồi, dịch vụ không cắt bỏ điều kiện/ngoại lệ để tạo câu trả lời. Không có LLM tự sinh điều khoản.
+
+**Hiệu chuẩn offline:** `evaluate.py` ghi `records` từng case và `timeouts_ms`; `analyze_evaluation.py` báo cáo Brier/ECE theo abstention-as-confidence với nhãn `OFFLINE_ONLY`, input hỏng cho `evaluation_ready=false`. Ngưỡng hiệu chuẩn chỉ phục vụ tuning, không bao giờ dùng để bật tool.
 
 Chạy demo từ source checkout sau khi cài `requirements/dev.lock`:
 
