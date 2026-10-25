@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     ollama_rag_model: str = "smartevent-rag:3b"
     ollama_timeout_seconds: float = 10.0
 
+    rag_backend: str = "extractive"
+    rag_adapter_path: Path | None = Field(default=None)
+    rag_base_model: str = "Qwen/Qwen2.5-3B-Instruct"
+    rag_load_4bit: bool = True
+
     @property
     def effective_config_dir(self) -> Path:
         if self.config_dir is not None:

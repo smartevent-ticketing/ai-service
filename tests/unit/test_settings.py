@@ -35,11 +35,16 @@ def test_nlu_settings_defaults_and_override(tmp_path: Path) -> None:
         nlu_adapter_path=tmp_path / "adapter",
         nlu_base_model="Qwen/Qwen2.5-1.5B-Instruct",
         nlu_load_4bit=False,
+        rag_backend="ollama",
+        rag_adapter_path=tmp_path / "rag_adapter",
         _env_file=None,
     )
     assert custom.nlu_backend == "peft"
     assert custom.nlu_adapter_path == tmp_path / "adapter"
     assert custom.nlu_load_4bit is False
+    assert custom.rag_backend == "ollama"
+    assert custom.rag_adapter_path == tmp_path / "rag_adapter"
+
 
 
 def test_bootstrap_builds_nlu_by_backend_setting() -> None:
@@ -73,5 +78,20 @@ def test_bootstrap_builds_nlu_by_backend_setting() -> None:
         )
     )
     assert isinstance(chat_ollama._nlu, OllamaNLU)
+
+    # RAG backend generative wiring
+    from smartevent_ai.adapters.outbound.knowledge.policy_synthesizer import OllamaPolicySynthesizer
+
+    chat_rag_ollama, _ = build_chat(
+        Settings(
+            rag_backend="ollama",
+            ollama_base_url="http://127.0.0.1:11434",
+            ollama_rag_model="smartevent-rag:3b",
+            _env_file=None,
+        )
+    )
+    assert isinstance(chat_rag_ollama._policies._synthesizer, OllamaPolicySynthesizer)
+    assert chat_rag_ollama._policies.answer_mode == "generative"
+
 
 

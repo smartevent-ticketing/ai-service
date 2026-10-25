@@ -158,7 +158,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "status": "degraded" if not enabled else "ready",
             "business_tools_enabled": enabled,
             "model_backend": configuration.nlu_backend,
-            "policy_retrieval": {"status": chat.policy_status(), "answer_mode": "extractive"},
+            "policy_retrieval": {
+                "status": chat.policy_status(),
+                "answer_mode": chat.policy_answer_mode(),
+            },
         }
 
     @app.post("/api/v1/chat", response_model=ChatResponseDTO)

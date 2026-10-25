@@ -5,6 +5,7 @@ import asyncio
 from smartevent_ai.adapters.outbound.knowledge.artifact_reader import ArtifactKnowledgeStore
 from smartevent_ai.adapters.outbound.knowledge.contracts import read_bytes
 from smartevent_ai.adapters.outbound.knowledge.lexical_reader import BM25Retriever
+from smartevent_ai.application.knowledge_ports import PolicySynthesizer
 from smartevent_ai.application.retrieve_policy import NO_EVIDENCE, RetrievePolicy
 from smartevent_ai.domain.knowledge import KnowledgeError, PolicyAnswer, eligible_chunks
 from smartevent_ai.infrastructure.knowledge_config import ReviewedRagConfig, SystemClock
@@ -28,9 +29,19 @@ class RuntimeArtifacts:
 
 
 class RuntimePolicyReader:
-    def __init__(self, config: ReviewedRagConfig, test_environment: bool = False) -> None:
+    def __init__(
+        self,
+        config: ReviewedRagConfig,
+        test_environment: bool = False,
+        synthesizer: PolicySynthesizer | None = None,
+    ) -> None:
         self._config = config
         self._store = ArtifactKnowledgeStore(RuntimeArtifacts(config), allow_test=test_environment)
+        self._synthesizer = synthesizer
+
+    @property
+    def answer_mode(self) -> str:
+        return "generative" if self._synthesizer is not None else "extractive"
 
     def status(self) -> str:
         try:
@@ -53,6 +64,7 @@ class RuntimePolicyReader:
                 SystemClock(),
                 config.max_results,
                 config.max_answer_chars,
+                synthesizer=self._synthesizer,
             )
             return await asyncio.wait_for(
                 asyncio.to_thread(use_case.answer, query), timeout=config.timeout_ms / 1000

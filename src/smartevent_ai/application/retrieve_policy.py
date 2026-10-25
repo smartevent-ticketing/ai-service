@@ -5,6 +5,7 @@ from smartevent_ai.application.knowledge_ports import (
     EvidenceJudge,
     EvidenceRetriever,
     KnowledgeStore,
+    PolicySynthesizer,
 )
 from smartevent_ai.domain.evidence import EvidenceVerdict, classify
 from smartevent_ai.domain.knowledge import (
@@ -38,12 +39,14 @@ class RetrievePolicy:
         limit: int = 3,
         max_answer_chars: int = 6000,
         judge: EvidenceJudge | None = None,
+        synthesizer: PolicySynthesizer | None = None,
     ) -> None:
         if not 1 <= limit <= 5 or not 256 <= max_answer_chars <= 16000:
             raise KnowledgeError("Invalid retrieval limits")
         self._store, self._retriever, self._clock = store, retriever, clock
         self._limit, self._max_answer_chars = limit, max_answer_chars
         self._judge = judge or DomainEvidenceJudge()
+        self._synthesizer = synthesizer
 
     def answer(self, query: str) -> PolicyAnswer:
         if not isinstance(query, str) or not 1 <= len(query.strip()) <= 2000:
@@ -122,7 +125,12 @@ class RetrievePolicy:
             )
         if not citations:
             return PolicyAnswer(NO_EVIDENCE)
-        return PolicyAnswer(
-            "Trích đoạn từ chính sách đã được phê duyệt:\n\n" + "\n\n".join(passages),
-            tuple(citations),
-        )
+        raw_passages = "Trích đoạn từ chính sách đã được phê duyệt:\n\n" + "\n\n".join(passages)
+        if self._synthesizer is not None:
+            try:
+                synthesized = self._synthesizer.synthesize(query, raw_passages)
+                if synthesized and isinstance(synthesized, str) and synthesized.strip():
+                    return PolicyAnswer(synthesized.strip(), tuple(citations))
+            except Exception:
+                return PolicyAnswer(raw_passages, tuple(citations))
+        return PolicyAnswer(raw_passages, tuple(citations))

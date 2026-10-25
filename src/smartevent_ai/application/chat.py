@@ -27,6 +27,12 @@ class ChatUseCase:
     def policy_status(self) -> str:
         return self._policies.status() if self._policies is not None else "disabled"
 
+    def policy_answer_mode(self) -> str:
+        if self._policies is None:
+            return "extractive"
+        return getattr(self._policies, "answer_mode", "extractive")
+
+
     async def handle(self, request: ChatCommand) -> ChatResult:
         understood = self._nlu.parse(request.message, request.previous_state)
         state = merge_state(request.previous_state, understood.patch)
