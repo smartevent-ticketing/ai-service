@@ -1,0 +1,66 @@
+{
+  "timestamp": "2026-10-25T05:34:45Z",
+  "dataset_sizes": {
+    "nlu_cases": 131,
+    "rag_cases": 40,
+    "total": 171
+  },
+  "hardware": {
+    "device": "NVIDIA GeForce RTX 2050",
+    "vram_gb": 4.0,
+    "quantization": "4-bit NF4"
+  },
+  "nlu_evaluation": {
+    "total_samples": 131,
+    "json_valid_rate": 86.3,
+    "overall_intent_accuracy": 42.7,
+    "slot_match_rate": 74.0,
+    "read_only_compliance_rate": 40.0,
+    "latency_p50_s": 3.33,
+    "latency_p95_s": 6.94,
+    "throughput_tok_s": 11.8,
+    "intent_breakdown": {
+      "BOOKING_GUIDANCE": "6/13 (46.2%)",
+      "CHECKOUT_HANDOFF": "0/4 (0.0%)",
+      "CLARIFY": "0/4 (0.0%)",
+      "EVENT_COMPARE": "2/4 (50.0%)",
+      "EVENT_DETAIL": "3/6 (50.0%)",
+      "GREETING": "4/5 (80.0%)",
+      "HUMAN_HANDOFF": "2/4 (50.0%)",
+      "MY_TICKETS": "1/5 (20.0%)",
+      "ORDER_STATUS": "1/6 (16.7%)",
+      "OUT_OF_SCOPE": "1/6 (16.7%)",
+      "PAYMENT_STATUS": "1/5 (20.0%)",
+      "REFUND_POLICY": "7/8 (87.5%)",
+      "REFUND_SUPPORT": "2/4 (50.0%)",
+      "RESERVATION_STATUS": "3/4 (75.0%)",
+      "SEARCH_EVENT": "10/12 (83.3%)",
+      "SEAT_AVAILABILITY": "4/5 (80.0%)",
+      "TICKET_ALTERNATIVE": "0/4 (0.0%)",
+      "TICKET_AVAILABILITY": "2/6 (33.3%)",
+      "TICKET_PRICE": "1/6 (16.7%)",
+      "TICKET_RECOMMEND": "2/14 (14.3%)",
+      "TICKET_TRANSFER_HELP": "4/6 (66.7%)"
+    }
+  },
+  "rag_evaluation": {
+    "total_samples": 40,
+    "grounding_accuracy_rate": 63.3,
+    "read_only_refusal_rate": 100.0,
+    "hallucination_resistance_rate": 100.0,
+    "latency_p50_s": 9.45,
+    "latency_p95_s": 14.89,
+    "throughput_tok_s": 8.9,
+    "category_breakdown": {
+      "checkin": "4/4 (100.0%)",
+      "hallucination": "5/5 (100.0%)",
+      "personal_refusal": "3/7 (42.9%)",
+      "read_only_gate": "5/5 (100.0%)",
+      "refund_cancel": "4/5 (80.0%)",
+      "refund_reschedule": "4/5 (80.0%)",
+      "refund_timing": "0/3 (0.0%)",
+      "transfer": "3/4 (75.0%)",
+      "upgrade_refusal": "1/2 (50.0%)"
+    }
+  }
+}

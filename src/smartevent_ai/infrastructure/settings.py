@@ -24,6 +24,16 @@ class Settings(BaseSettings):
     backend_base_url: str = "http://127.0.0.1:8080"
     config_dir: Path | None = Field(default=None)
 
+    nlu_backend: str = "rule"
+    nlu_adapter_path: Path | None = Field(default=None)
+    nlu_base_model: str = "Qwen/Qwen2.5-1.5B-Instruct"
+    nlu_load_4bit: bool = True
+
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_nlu_model: str = "smartevent-nlu:1.5b"
+    ollama_rag_model: str = "smartevent-rag:3b"
+    ollama_timeout_seconds: float = 10.0
+
     @property
     def effective_config_dir(self) -> Path:
         if self.config_dir is not None:

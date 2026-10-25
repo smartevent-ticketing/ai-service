@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-10-25T04:37:59Z",
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 2050",
+    "vram_total_gb": 3.99951171875,
+    "quantization": "4-bit NF4 bitsandbytes"
+  },
+  "nlu_1.5b": {
+    "model": "smartevent-nlu-qwen1.5b-final",
+    "samples": 13,
+    "json_validity_rate": 92.3076923076923,
+    "intent_accuracy": 61.53846153846154,
+    "slot_accuracy": 84.61538461538461,
+    "read_only_gate_compliance": 66.66666666666666,
+    "vram_mb": 1170.3662109375,
+    "latency_p50_s": 3.6409835815429688,
+    "latency_p95_s": 7.088253498077393,
+    "throughput_tok_s": 11.457522761307638
+  },
+  "rag_3b": {
+    "model": "smartevent-rag-qwen3b-final",
+    "samples": 6,
+    "grounding_rate": 66.66666666666666,
+    "read_only_refusal_rate": 100.0,
+    "hallucination_resistance": 100.0,
+    "vram_mb": 2084.921875,
+    "latency_p50_s": 8.262702226638794,
+    "latency_p95_s": 8.569465637207031,
+    "throughput_tok_s": 8.831810698419833
+  }
+}

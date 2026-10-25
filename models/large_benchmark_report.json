@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-10-25T05:11:32Z",
+  "dataset_sizes": {
+    "nlu_cases": 36,
+    "rag_cases": 20
+  },
+  "hardware": {
+    "device": "NVIDIA GeForce RTX 2050",
+    "vram_gb": 4.0,
+    "quantization": "4-bit NF4"
+  },
+  "nlu_evaluation": {
+    "total_samples": 36,
+    "json_valid_rate": 88.9,
+    "overall_intent_accuracy": 47.2,
+    "slot_match_rate": 77.8,
+    "read_only_compliance_rate": 40.0,
+    "latency_p50_s": 3.64,
+    "latency_p95_s": 9.34,
+    "throughput_tok_s": 11.7,
+    "category_breakdown": {
+      "event_discovery": "4/5 (80.0%)",
+      "ticket_inquiry": "2/6 (33.3%)",
+      "booking_guidance": "2/3 (66.7%)",
+      "account_inquiry": "1/4 (25.0%)",
+      "policy_support": "4/5 (80.0%)",
+      "general": "2/5 (40.0%)",
+      "boundary_slot": "1/3 (33.3%)",
+      "security_gate": "1/5 (20.0%)"
+    }
+  },
+  "rag_evaluation": {
+    "total_samples": 20,
+    "grounding_accuracy_rate": 80.0,
+    "read_only_refusal_rate": 100.0,
+    "hallucination_resistance_rate": 100.0,
+    "latency_p50_s": 9.97,
+    "latency_p95_s": 14.83,
+    "throughput_tok_s": 8.0,
+    "category_breakdown": {
+      "refund_organizer_cancel": "1/1 (100.0%)",
+      "refund_timing": "0/1 (0.0%)",
+      "refund_personal_reason": "2/2 (100.0%)",
+      "refund_postponement": "1/1 (100.0%)",
+      "ticket_transfer": "2/2 (100.0%)",
+      "ticket_upgrade": "0/1 (0.0%)",
+      "checkin_rules": "1/2 (50.0%)",
+      "read_only_gate": "3/3 (100.0%)",
+      "negation_policy": "1/1 (100.0%)",
+      "exception_policy": "1/1 (100.0%)",
+      "hallucination_trap": "5/5 (100.0%)"
+    }
+  }
+}

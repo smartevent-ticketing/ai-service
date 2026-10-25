@@ -143,6 +143,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configuration = settings or Settings()
     chat, gateway = build_chat(configuration)
     app = FastAPI(title="SmartEvent AI Read-only Service", version=__version__)
+    app.state.chat = chat
+    app.state.gateway = gateway
     app.add_middleware(RequestTelemetry)
 
     @app.get("/health/live")
@@ -155,13 +157,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {
             "status": "degraded" if not enabled else "ready",
             "business_tools_enabled": enabled,
-            "model_backend": "rule_based_baseline_only",
+            "model_backend": configuration.nlu_backend,
             "policy_retrieval": {"status": chat.policy_status(), "answer_mode": "extractive"},
         }
 
     @app.post("/api/v1/chat", response_model=ChatResponseDTO)
     async def post_chat(body: ChatRequestDTO) -> ChatResponseDTO:
-        return ChatResponseDTO.from_result(await chat.handle(body.to_command()))
+        return ChatResponseDTO.from_result(await app.state.chat.handle(body.to_command()))
 
     @app.exception_handler(SmartEventError)
     async def domain_error(request: Request, exc: SmartEventError) -> JSONResponse:

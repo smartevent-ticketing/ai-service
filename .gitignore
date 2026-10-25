@@ -16,3 +16,8 @@ reports/
 *.log
 artifacts/
 .models/
+
+# Model unpacked cache & generated binaries (GGUF >1GB)
+models/unpacked_*
+models/*.gguf
+
