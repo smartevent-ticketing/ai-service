@@ -2,7 +2,7 @@ name: AI Service CI
 
 on:
   push:
-    branches: [main, dev, "codex/**", "feat/**", "fix/**"]
+    branches: [main, dev, "codex/**", "feat/**", "fix/**", "loop/**"]
   pull_request:
     branches: [main, dev]
   workflow_dispatch:

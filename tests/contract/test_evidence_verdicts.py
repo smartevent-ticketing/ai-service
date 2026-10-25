@@ -1,5 +1,7 @@
 """Negative-first contract for offline evidence verdicts (kept/conflicts/dropped)."""
 
+import pytest
+
 from smartevent_ai.domain.evidence import EvidenceVerdict, classify
 
 
@@ -30,7 +32,7 @@ def test_injection_chunk_is_dropped() -> None:
 
 def test_premise_contradiction_goes_to_conflicts() -> None:
     chunk = _chunk("Không bao giờ hoàn tiền trong mọi trường hợp.")
-    assert classify("khi nào được hoàn tiền?", chunk) is EvidenceVerdict.CONFLICTS
+    assert classify("Mọi vé đều được hoàn tiền", chunk) is EvidenceVerdict.CONFLICTS
 
 
 def test_off_topic_query_is_dropped() -> None:
@@ -63,3 +65,48 @@ def test_classifier_never_raises_but_drops_on_crash() -> None:
             raise ValueError("boom")
 
     assert classify("hoàn tiền?", Exploding()) is EvidenceVerdict.DROPPED  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "chính sách hoàn tiền",
+        "Xin cho tôi biết về chính sách hoàn tiền được không?",
+        "Xin cho toi biet ve chinh sach hoan tien duoc khong?",
+    ],
+)
+def test_polite_query_does_not_lose_relevant_evidence(query: str) -> None:
+    assert (
+        classify(query, _chunk("Chính sách hoàn tiền: xử lý trong 7 ngày.")) is EvidenceVerdict.KEPT
+    )
+
+
+@pytest.mark.parametrize(
+    "query,text,expected",
+    [
+        (
+            "Khi nào được hoàn tiền?",
+            "Không bao giờ hoàn tiền trong mọi trường hợp.",
+            EvidenceVerdict.KEPT,
+        ),
+        (
+            "Chính sách hoàn tiền?",
+            "Không được chia sẻ mật khẩu đăng nhập.",
+            EvidenceVerdict.DROPPED,
+        ),
+        ("Không bao giờ hoàn tiền.", "Không bao giờ hoàn tiền.", EvidenceVerdict.KEPT),
+        ("Không bao giờ hoàn tiền.", "Tất cả vé đều được hoàn tiền.", EvidenceVerdict.CONFLICTS),
+        (
+            "Vé chưa sử dụng được hoàn tiền, ngoại trừ vé khuyến mại có đúng không?",
+            "Vé chưa sử dụng được hoàn tiền, ngoại trừ vé khuyến mại.",
+            EvidenceVerdict.KEPT,
+        ),
+        (
+            "Mọi vé đều được hoàn tiền.",
+            'Không đúng khi nói "không bao giờ hoàn tiền".',
+            EvidenceVerdict.KEPT,
+        ),
+    ],
+)
+def test_only_explicit_opposite_claims_are_conflicts(query, text, expected) -> None:
+    assert classify(query, _chunk(text)) is expected

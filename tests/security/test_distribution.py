@@ -3,10 +3,12 @@
 import importlib.util
 import json
 import sys
+from fnmatch import fnmatchcase
 from pathlib import Path
 from types import ModuleType
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -107,3 +109,12 @@ def test_verified_source_export_excludes_local_files(
     (workspace / "README.md").write_bytes(b"unreviewed edit\n")
     with pytest.raises(SystemExit, match="mismatch"):
         manifest.verify_manifest()
+
+
+def test_ci_push_trigger_covers_current_development_branch_convention() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    # PyYAML's YAML 1.1 resolver treats GitHub's "on" key as boolean True.
+    triggers = workflow.get("on", workflow.get(True))
+    branch = "loop/p0-pr4-inplace-hardening"
+    patterns = triggers["push"]["branches"]
+    assert any(fnmatchcase(branch, pattern) for pattern in patterns)

@@ -20,3 +20,5 @@ enabled by this document, environment variables or unit-test success.
 Request IDs and safe request latency/status JSON logs are available. There is no
 claim of model/tool stage metrics, alert coverage or measured production capacity.
 The service must remain a local/demo foundation while these gates are missing.
+
+Kế hoạch triển khai theo PR, phát hiện review mới và tiêu chí nghiệm thu: [PROJECT_EXECUTION_PLAN.md](PROJECT_EXECUTION_PLAN.md). Đây là kế hoạch, không cấp quyền bật tool.

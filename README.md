@@ -133,11 +133,46 @@ Tệp `.env` dành cho cấu hình local và đã được loại khỏi Git. N�
 ```bash
 python -m pip install --require-hashes -r requirements/dev.lock
 python -m pip install --no-deps --no-build-isolation -e .
-python scripts/verify_dependency_locks.py
+python scripts/verify/verify_dependency_locks.py
 ```
 
-### 3. Khởi động API
+### 3. Thiết lập Mô hình AI (GGUF / Ollama hoặc PEFT)
 
+Repository đã đính kèm sẵn 2 bộ trọng số LoRA finetuned trong thư mục `models/`:
+- `models/smartevent-nlu-qwen1.5b-final.zip` (29.8 MB) — NLU bóc tách intent, slots, proposed action.
+- `models/smartevent-rag-qwen3b-final.zip` (46.1 MB) — RAG giải đáp chính sách SmartEvent.
+
+#### Cách 1: Chạy qua Ollama (Khuyến nghị cho máy Local)
+
+Cài đặt [Ollama](https://ollama.com) nếu chưa có (`winget install Ollama.Ollama` trên Windows), sau đó bật Ollama daemon:
+```bash
+ollama serve
+```
+
+Chạy script tự động giải nén trọng số và nạp model vào Ollama:
+```bash
+python scripts/setup_ollama_models.py
+```
+
+#### Cách 2: Chạy trực tiếp qua PyTorch 4-bit (In-process PEFT)
+Yêu cầu card đồ họa NVIDIA (CUDA 12.x) và các thư viện PyTorch, PEFT, BitsAndBytes:
+```bash
+python scripts/test_models_inference.py --mode all
+```
+
+### 4. Khởi động API
+
+**Với Ollama backend (Khuyến nghị):**
+```bash
+# Windows PowerShell
+$env:NLU_BACKEND="ollama"
+python -m uvicorn smartevent_ai.main:app --reload --host 127.0.0.1 --port 8001
+
+# Linux / macOS
+NLU_BACKEND=ollama python -m uvicorn smartevent_ai.main:app --reload --host 127.0.0.1 --port 8001
+```
+
+**Với Baseline luật (Không cần GPU hay model):**
 ```bash
 python -m uvicorn smartevent_ai.main:app --reload --host 127.0.0.1 --port 8001
 ```
@@ -239,6 +274,13 @@ Phản hồi đầy đủ còn có `conversation_id` và các trường state kh
 | `APP_ENV` | `development` | Nhãn môi trường; không tự thay đổi quyền của tool |
 | `BACKEND_BASE_URL` | `http://127.0.0.1:8080` | Origin backend do bên triển khai cấu hình, không lấy từ model hoặc request |
 | `CONFIG_DIR` | Thư mục `resources/` trong package | Chọn thư mục chứa bộ YAML đã được review; `.env.example` đặt thành `configs` |
+| `NLU_BACKEND` | `rule` | Chọn engine NLU: `rule` (baseline nhẹ), `ollama` (GGUF ngoài), hoặc `peft` (PyTorch in-process) |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434` | Địa chỉ daemon Ollama khi chọn `NLU_BACKEND=ollama` |
+| `OLLAMA_NLU_MODEL` | `smartevent-nlu:1.5b` | Tên model NLU đã build trong Ollama |
+| `OLLAMA_RAG_MODEL` | `smartevent-rag:3b` | Tên model RAG đã build trong Ollama |
+| `OLLAMA_TIMEOUT_SECONDS` | `10.0` | Giới hạn thời gian gọi suy luận Ollama trước khi kích hoạt fallback luật |
+| `NLU_ADAPTER_PATH` | `None` | Đường dẫn thư mục LoRA adapter khi chọn `NLU_BACKEND=peft` |
+| `NLU_LOAD_4BIT` | `true` | Bật lượng hóa 4-bit NF4 khi nạp model PEFT trực tiếp vào GPU |
 
 Các tệp cấu hình runtime chính:
 
@@ -251,7 +293,7 @@ Các tệp cấu hình runtime chính:
 `configs/` là nguồn cấu hình chuẩn trong repository. Các bản fallback tại `src/smartevent_ai/resources/` phải **giống từng byte**, giúp wheel khởi động từ thư mục bất kỳ. Sau khi sửa cấu hình, chạy:
 
 ```bash
-python scripts/verify_runtime_config_sync.py
+python scripts/verify/verify_runtime_config_sync.py
 ```
 
 Không có biến môi trường để bỏ qua gate hoặc bật riêng từng business tool. Thay đổi quyền cần được review cùng bằng chứng tích hợp tương ứng.
@@ -264,12 +306,12 @@ Hai công việc chia dữ liệu được tách riêng: `dataset_split.py` chia
 
 **Luồng chat:** lọc nguồn công khai đã duyệt/còn hiệu lực → BM25 → phân loại bằng chứng (kept/conflicts/dropped: injection và premise-contradiction bị loại hoặc giữ làm bằng chứng phản biện có đánh dấu, query off-topic/thiếu evidence bị loại) → kiểm tra lại catalog → lấy nguyên phần cha chứa bằng chứng → trả trích đoạn với citation. Nếu phần nguồn đầy đủ vượt giới hạn phản hồi, dịch vụ không cắt bỏ điều kiện/ngoại lệ để tạo câu trả lời. Không có LLM tự sinh điều khoản.
 
-**Hiệu chuẩn offline:** `evaluate.py` ghi `records` từng case và `timeouts_ms`; `analyze_evaluation.py` báo cáo Brier/ECE theo abstention-as-confidence với nhãn `OFFLINE_ONLY`, input hỏng cho `evaluation_ready=false`. Ngưỡng hiệu chuẩn chỉ phục vụ tuning, không bao giờ dùng để bật tool.
+**Hiệu chuẩn offline:** `evaluate.py` ghi `records` từng case và `timeouts_ms`; `analyze_evaluation.py` báo cáo Brier/ECE theo khớp chính xác tập nguồn, với mức tin cậy giả định 0,9 cho quyết định trả lời/từ chối (không phải xác suất model đã hiệu chuẩn) với nhãn `OFFLINE_ONLY`, input hỏng cho `evaluation_ready=false`. Ngưỡng hiệu chuẩn chỉ phục vụ tuning, không bao giờ dùng để bật tool.
 
 Chạy demo từ source checkout sau khi cài `requirements/dev.lock`:
 
 ```bash
-python scripts/knowledge_smoke.py --output artifacts/knowledge-demo
+python scripts/knowledge/knowledge_smoke.py --output artifacts/knowledge-demo
 ```
 
 Thư mục đầu ra phải mới. Demo dùng tokenizer BPE và tài liệu **TEST_ONLY**, kiểm tra cả nguồn nội bộ/không có bằng chứng. Demo không bật RAG và không tạo phê duyệt chính sách thật.
@@ -307,23 +349,23 @@ Sau khi kích hoạt môi trường và cài đặt dependency:
 
 ```bash
 python -m compileall -q src scripts tests
-python scripts/static_verify.py
-python scripts/verify_runtime_config_sync.py
-python scripts/verify_dependency_locks.py
-python scripts/export_knowledge_schemas.py --verify
+python scripts/verify/static_verify.py
+python scripts/verify/verify_runtime_config_sync.py
+python scripts/verify/verify_dependency_locks.py
+python scripts/knowledge/export_knowledge_schemas.py --verify
 python -m ruff check src tests scripts
 python -m ruff format --check src tests scripts
 python -m mypy src
 python -m pytest -q --cov=smartevent_ai --cov-report=term-missing --cov-fail-under=90
-python scripts/verify_contexts.py
-python scripts/source_manifest.py --verify
+python scripts/verify/verify_contexts.py
+python scripts/verify/source_manifest.py --verify
 python -m pip_audit --no-deps --disable-pip -r requirements/runtime.lock
 python -m pip_audit --no-deps --disable-pip -r requirements/rag.lock
 python -m pip wheel --no-deps --no-build-isolation . -w dist/wheel
-python scripts/wheel_smoke.py dist/wheel
+python scripts/release/wheel_smoke.py dist/wheel
 ```
 
-Khi thay đổi mã nguồn hoặc tài liệu đã được review, tạo lại manifest bằng `python scripts/source_manifest.py`, kiểm tra diff rồi xác minh lại bằng `--verify`. Không tạo lại hash của ngữ cảnh lịch sử để hợp thức hóa việc sửa tệp gốc.
+Khi thay đổi mã nguồn hoặc tài liệu đã được review, tạo lại manifest bằng `python scripts/verify/source_manifest.py`, kiểm tra diff rồi xác minh lại bằng `--verify`. Không tạo lại hash của ngữ cảnh lịch sử để hợp thức hóa việc sửa tệp gốc.
 
 Chi tiết bằng chứng local ở [`QA_REPORT.md`](docs/architecture/QA_REPORT.md); đó là bản ghi trước lần push đầu tiên. Kết quả CI từ xa được dẫn riêng ở trên. CI thành công xác nhận các gate kỹ thuật đã chạy, không cấp quyền bật tool hoặc chứng nhận hệ thống đủ điều kiện production.
 

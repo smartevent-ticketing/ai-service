@@ -1,3 +1,9 @@
-"""Compatibility shim (1 release): use scripts/release/wheel_smoke."""
+"""Compatibility CLI/import shim (1 release): use scripts/release/wheel_smoke."""
 
-from scripts.release.wheel_smoke import *  # noqa: F401,F403
+if __name__ == "__main__":
+    import runpy
+    from pathlib import Path
+
+    runpy.run_path(str(Path(__file__).parent / "release" / "wheel_smoke.py"), run_name="__main__")
+else:
+    from scripts.release.wheel_smoke import *  # noqa: F401,F403

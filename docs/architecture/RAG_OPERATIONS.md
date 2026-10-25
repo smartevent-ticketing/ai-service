@@ -5,7 +5,7 @@
 Từ source checkout đã cài `requirements/dev.lock` và editable package:
 
 ```bash
-python scripts/knowledge_smoke.py --output artifacts/knowledge-demo
+python scripts/knowledge/knowledge_smoke.py --output artifacts/knowledge-demo
 ```
 
 Đầu ra gồm catalog TEST_ONLY, `build/release.json`, `chunks.jsonl`,
@@ -73,23 +73,38 @@ benchmark model đa ngôn ngữ thật là bằng chứng riêng được lưu d
 python -m smartevent_ai.tooling.offline_jobs.analyze_evaluation --input artifacts/evaluation.json
 ```
 
-`evaluate.py` ghi `records` từng case (case_id/split/query/expected/retrieved/
+`evaluate.py` ghi `records` từng case (case_id/group/split/query/expected/retrieved/
 abstained/latency_ms/timed_out) kèm `timeouts_ms` cho case vượt 2000 ms.
-`analyze_evaluation` đọc records và in báo cáo hiệu chuẩn (Brier/ECE theo
-abstention-as-confidence: abstained 0.1, answered 0.9; latency p50/p95) với
-nhãn `OFFLINE_ONLY`. Input hỏng (thiếu field, trùng case, group leak
-dev/test) cho `evaluation_ready=false`, không in metric nửa vời. Ngưỡng hiệu
-chuẩn chỉ phục vụ tuning offline; không có code path nào đọc báo cáo để bật
+`analyze_evaluation` dùng nhãn đúng khi **tập nguồn trả về khớp chính xác tập nguồn
+mong đợi**, gồm trường hợp cả hai rỗng (từ chối đúng). Thiếu/thừa/sai nguồn là sai;
+thứ tự nguồn không ảnh hưởng nhãn. Báo cáo có `exact_source_set_accuracy`, Brier/ECE
+và latency p50/p95. `confidence_mode=fixed_decision_proxy` ghi rõ mức tin cậy giả
+định 0,9 cho cả quyết định trả lời và từ chối: đây là chẩn đoán offline, **không
+phải bằng chứng đã hiệu chuẩn xác suất model**, không so sánh trực tiếp với báo cáo
+cũ dùng abstention-as-confidence.
+
+Record thiếu field, sai kiểu, ID trùng, ranking không hợp lệ, abstention mâu thuẫn,
+latency âm/không hữu hạn hoặc group leak dev/test cho `evaluation_ready=false`,
+không xuất metric từng phần. Bản records cũ thiếu `group` vẫn đọc được nhưng ghi
+`groups_verified=false`; không dùng bản đó làm bằng chứng đã kiểm tra tách nhóm.
+Các báo cáo luôn mang nhãn `OFFLINE_ONLY`; không có code path đọc báo cáo để bật
 tool (`SPEC_TEST_ONLY`/`BLOCKED`/`NOT_RUN` không phải `PASS`).
 
 ## Verdicts bằng chứng (kept/conflicts/dropped)
 
-`domain/evidence.py` (stdlib-only) phân loại mỗi chunk sau BM25-rank, theo đúng
-thứ tự: injection → premise-contradiction → relevance (< 0.5 query-term
-coverage) → evidence. `CONFLICTS` được giữ làm undercutting evidence có
-citation (đánh dấu `[BẰNG CHỨNG PHẢN BIỆN — cần đối chiếu]`), không lọc âm
-thầm; check crash/timeout → `DROPPED`. Judge fail toàn bộ → fallback BM25
-thuần, không fail-closed request.
+`domain/evidence.py` (stdlib-only) phân loại mỗi chunk sau BM25-rank: injection →
+premise-contradiction → relevance (< 0,5 query-term coverage) → evidence. Stopword
+và văn bản cùng được chuẩn hóa không dấu, nên lời hỏi lịch sự không tự làm mất
+bằng chứng liên quan.
+
+`CONFLICTS` chỉ nhận diện hai khẳng định phổ quát hoàn tiền đối lập, khớp mẫu rõ
+ràng (ví dụ fixture “Mọi vé đều được hoàn tiền” đối lập “Không bao giờ hoàn tiền”).
+Đây là bộ luật giới hạn cho baseline, chưa phải suy luận mâu thuẫn ngữ nghĩa tổng
+quát. Câu hỏi mở, điều kiện, ngoại lệ hoặc trích dẫn không tự mang nhãn mâu thuẫn
+chỉ vì có từ phủ định. `CONFLICTS` vẫn được giữ với citation và đánh dấu
+`[BẰNG CHỨNG PHẢN BIỆN — cần đối chiếu]`. Check crash → `DROPPED`; judge fail toàn
+bộ → fallback BM25 thuần, không fail-closed request. Nguồn vẫn phải qua toàn bộ
+kiểm tra quyền/thời hiệu/hash của pipeline.
 
 ## Publish và rollback
 

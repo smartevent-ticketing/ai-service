@@ -163,6 +163,7 @@ def test_evaluation_reports_real_metrics_and_prevents_query_group_leakage(tmp_pa
         NOW,
     )
     assert result["runtime_enable_authorized"] is False
+    assert [r["group"] for r in result["records"]] == ["refund", "astronomy"]
     assert result["metrics"]["test"]["recall_at_5"] == 1
     assert result["metrics"]["test"]["negative_abstention_rate"] == 1
     rows.append(dict(rows[0], case_id="leaking", split="dev"))
@@ -176,3 +177,37 @@ def test_evaluation_reports_real_metrics_and_prevents_query_group_leakage(tmp_pa
             path,
             NOW,
         )
+
+
+def test_polite_refund_query_keeps_citation_through_real_artifacts(tmp_path) -> None:
+    from knowledge_helpers import catalog_bytes, source, tokenizer
+
+    from smartevent_ai.adapters.outbound.knowledge.structure_chunker import StructureChunker
+    from smartevent_ai.tooling.offline_jobs.build_index import build_index
+
+    policy = "Chính sách hoàn tiền: xử lý trong 7 ngày."
+    (tmp_path / "refund.md").write_text(policy, encoding="utf-8")
+    metadata = source(title="Hoàn tiền", content_sha256=digest(policy.encode()))
+    catalog = catalog_bytes([("refund.md", metadata)])
+    catalog_path = tmp_path / "catalog.json"
+    catalog_path.write_bytes(catalog)
+    output = tmp_path / "build"
+    manifest = build_index(
+        tmp_path,
+        catalog_path,
+        digest(catalog),
+        output,
+        StructureChunker(tokenizer()),
+        "TEST_ONLY_fix",
+        NOW,
+    )
+    artifacts = FrozenArtifacts(
+        catalog, digest(catalog), (output / "release.json").read_bytes(), manifest["release_sha256"]
+    )
+    reader = RetrievePolicy(
+        ArtifactKnowledgeStore(artifacts, True), BM25Retriever(), FrozenClock(NOW)
+    )
+    short = reader.answer("chính sách hoàn tiền")
+    polite = reader.answer("Xin cho tôi biết về chính sách hoàn tiền được không?")
+    assert short.citations and polite.citations == short.citations
+    assert policy in polite.answer

@@ -98,6 +98,7 @@ def evaluate(
             records.append(
                 dict(
                     case_id=row.case_id,
+                    group=row.group,
                     split=row.split,
                     query=row.query,
                     expected=sorted(expected),

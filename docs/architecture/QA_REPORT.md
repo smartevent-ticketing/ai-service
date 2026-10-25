@@ -1,4 +1,38 @@
-# Foundation 0.1.2 — verification evidence
+# Verification evidence
+
+## Local review fixes — 0.2.0, 2026-10-23
+
+Scope: current uncommitted working tree at baseline `861bfcd`. This records
+local results, not remote CI or production approval. Repairs and limitations:
+[REVIEW_LOG.md](REVIEW_LOG.md); execution status: [PROJECT_EXECUTION_PLAN.md](PROJECT_EXECUTION_PLAN.md).
+
+| Gate | Current result |
+|---|---|
+| Full unit/contract/security suite | PASS, 348 tests, 92.47% statement coverage; Windows Python 3.12.10, `COVERAGE_CORE=pytrace` |
+| Default coverage core | BLOCKED_ENV, native Windows access violation; no passing claim for that core |
+| Historical reference tests / integrity | PASS, 47 tests / original 49 file hashes |
+| Compile/static/Ruff/format/Mypy | PASS, 53 source files checked by Mypy |
+| Runtime config / knowledge schemas / dependency lock | PASS |
+| Project environment dependency consistency | PASS, pip check |
+| Offline TEST_ONLY knowledge smoke | PASS; does not authorize runtime retrieval |
+| Wheel build | PASS, offline build of 0.2.0 |
+| New isolated wheel installation and HTTP smoke | NOT_RUN for this patch |
+| New dependency advisory audit | NOT_RUN for this patch |
+| Remote CI matrix / Docker / live integration | No qualifying evidence for this patch |
+
+The successful full suite explicitly loaded pytest_asyncio and pytest_cov with
+plugin autoload disabled. It retained all tests, the normal event loop and the
+90% threshold. The Python tracer is a supported coverage core; the native crash
+cause remains unresolved. TestClient deprecation and pyreadline shutdown warnings
+were visible and were not suppressed. Earlier socketpair blocking did not recur
+in this completed run.
+
+Current wheel: `smartevent_ai_service-0.2.0-py3-none-any.whl`, 82670 bytes,
+SHA-256 `3fd78597fd23f79d86f24b875c44c206ce6a069a1ac41cf3a34fb8950ebe73fc`.
+This is a build result, not an isolated-install or container result. The historical
+audit and wheel smoke results below do not certify the current patch.
+
+## Historical foundation 0.1.2 — verification evidence
 
 Date: 2026-10-18. Source preparation for GitHub upload is complete within the
 development-foundation scope. This is not a production or merge approval; remote

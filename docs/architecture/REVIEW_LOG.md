@@ -29,3 +29,83 @@ F08 closes invalid domain inputs. It does not claim the pure optimizer has live
 quota/seat/freshness integration. F06 closes supported slot clearing; it does not
 claim full v1.2 REFER/ADD/ontology implementation. Those product capabilities stay
 blocked as listed in [BACKLOG.md](BACKLOG.md), with all business tools disabled.
+
+
+## Sửa lỗi sau review ngày 23/10/2026
+
+Phạm vi: sửa trực tiếp các phát hiện tại `861bfcd`, không mở gate nghiệp vụ/RAG.
+Không sửa nội dung lịch sử trong `docs/contexts/v1.2/`.
+
+| Phát hiện | Sửa đổi | Bằng chứng hồi quy |
+|---|---|---|
+| CLI tương thích lỗi import hoặc thoát thành công mà không chạy | Script cũ chuyển tiếp bằng runpy; module tooling cũ gọi entrypoint thật | Subprocess kiểm tra help/thiếu tham số, tạo artifact và từ chối manifest bị đổi; cả đường dẫn script và `python -m` |
+| Metric vẫn coi sai nguồn là đúng | Nhãn khớp chính xác tập nguồn; công khai fixed_decision_proxy 0,9 cho quyết định trả lời/từ chối | Sai/thiếu/thừa nguồn, từ chối sai/đúng, thứ tự nguồn và median latency |
+| Record hỏng gây crash hoặc metric không hợp lệ | Kiểm tra kiểu ID/ranking/boolean/group, abstention nhất quán, latency hữu hạn không âm trước tính metric | Record chứa list/dict/NaN/Infinity/latency âm hoặc sai kiểu đều không tạo metric từng phần |
+| Lời hỏi lịch sự làm mất bằng chứng | Chuẩn hóa stopword cùng văn bản; tiêu đề riêng lẻ không đủ làm bằng chứng | Query ngắn/lịch sự/không dấu và retrieval qua artifact thật |
+| Phủ định/ngoại lệ bị coi là mâu thuẫn | Chỉ so khớp các khẳng định phổ quát hoàn tiền đối lập rõ ràng | Câu hỏi mở, ngoại lệ, khẳng định đồng thuận, trích dẫn và văn bản lạc chủ đề |
+| Lượt sửa thành phố mất tác vụ/từ khóa | Tiếp tục active task cho mẫu chỉnh bộ lọc đã nhận diện; giữ search_query | Đổi/xóa thành phố, tìm lại với bộ lọc mới, chuyển tác vụ, reset và tìm tất cả |
+
+Evaluation mới giữ `group` trong records. Analysis cũ thiếu group được ghi rõ
+`groups_verified=false`. Brier/ECE dùng proxy cố định, không phải bằng chứng đã
+hiệu chuẩn xác suất model; không so sánh trực tiếp với báo cáo trước lần sửa này.
+Bộ luật mâu thuẫn còn giới hạn, không thay thế đánh giá ngữ nghĩa hoặc JEV.
+
+Bằng chứng local Windows / Python 3.12:
+
+- 189 test không cần HTTP/async: PASS (gồm các ca subprocess CLI và artifact RAG).
+- 47 test tham chiếu lịch sử: PASS, không thay cho tích hợp backend.
+- Hai application smoke kiểm tra việc gọi lại search với bộ lọc đúng và ba ASGI
+  smoke cập nhật thành phố: PASS bằng coroutine thực thi trực tiếp, không dùng
+  chúng để thay thế full-suite HTTP/async.
+- Compile, static guard, Ruff/format, Mypy, schema/config sync và frozen dependency
+  lock: PASS. Wheel build offline: PASS.
+- Full suite kèm coverage đã thử nhưng BLOCKED_ENV: event loop Windows kẹt trong
+  socket._fallback_socketpair trước khi thực thi test đầu tiên; không có kết quả
+  coverage đủ điều kiện nghiệm thu. Không sửa event loop hoặc bỏ test để báo PASS.
+- Clean-wheel smoke, Docker, live integration và advisory audit chưa được xác nhận
+  trong lần sửa này. CI cần chạy các gate còn thiếu trước khi nghiệm thu.
+
+
+## PR-00 — sửa REV-01 và OBS-02 ngày 23/10/2026
+
+REV-01 đã sửa local: tách cụm số lượng vé/ghế khỏi từ khóa tìm kiếm ở đầu,
+giữa hoặc cuối, dùng cùng regex nhận diện slot. Giữ nguyên số thuộc tên sự kiện
+như `concert 2026` hoặc `show 20`. Khi không còn từ khóa, không gửi q và xóa
+query cũ trong state. Giữ quy tắc làm rõ số lượng không hợp lệ và ngân sách.
+
+OBS-02 đã sửa cấu hình: push trên `loop/**` được nhận bởi CI; permission vẫn là
+`contents: read`, các trigger PR/manual giữ nguyên. Chưa có push hoặc CI remote
+cho bản vá này; test cấu hình không thay thế bằng chứng CI run.
+
+Bằng chứng local bổ sung:
+
+- Trước bản sửa: 9 ca hồi quy NLU thất bại, gồm quantity-only, quantity ở cuối/
+  giữa từ khóa và lượt làm rõ ngân sách. Sau bản sửa: nhóm không cần HTTP/async
+  đạt 207 test; test CI được chạy lại sau sửa loader và đạt cùng 4 test distribution.
+- 47 test tham chiếu lịch sử PASS; hash nội dung lịch sử không thay đổi.
+- 9 application coroutine smoke PASS với recording gateway, trong đó 5 ca mới
+  kiểm tra arguments thực tế và chờ làm rõ ngân sách trước khi gọi tool. Smoke
+  này không được tính là pytest HTTP/async.
+- Compile, static guard, config/schema sync, lock integrity, Ruff/format, Mypy
+  (53 source files), pip check PASS.
+- Wheel build offline PASS. Pipeline knowledge smoke TEST_ONLY PASS, không cấp
+  quyền runtime và không chứng minh chất lượng corpus thật.
+
+Full suite hiện tại: **348 test PASS, statement coverage 92,47%** trên Windows /
+Python 3.12.10, gồm test HTTP/async và toàn bộ các ca chat mới. Dùng bộ đo được
+coverage.py hỗ trợ qua `COVERAGE_CORE=pytrace`; không thay event loop, không skip
+test hoặc giảm ngưỡng 90%. Chạy với plugin pytest_asyncio và pytest_cov được nạp
+rõ ràng, `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`, trên working tree hiện tại. Log local:
+`artifacts/fix-review-20261023/full-suite-pytrace.log` (artifact phát sinh, không
+thuộc source manifest).
+
+Hai lần dùng bộ đo mặc định bị Windows access violation (exit 0xC0000005), nên
+không tính là PASS. Lần pytrace hoàn tất với exit 0, 348 passed trong 93,35 giây.
+Việc treo socketpair ở lượt trước không tái hiện trong lần hoàn tất này; không
+suy ra đã sửa môi trường Windows hoặc nguyên nhân gốc của native crash. Cảnh báo
+TestClient và lỗi destructor pyreadline khi interpreter đóng vẫn hiện; chúng
+không làm lệnh pytrace thất bại và không bị che đi.
+
+PR-00 chưa hoàn tất nghiệm thu khi CI remote, advisory audit, clean-wheel và
+Docker smoke chưa có bằng chứng đạt cho head tương ứng. Không dùng kết quả audit/
+wheel smoke cũ của 0.1.2 để chứng nhận bản vá 0.2.0 hiện tại.

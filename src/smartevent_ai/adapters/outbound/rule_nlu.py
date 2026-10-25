@@ -37,6 +37,14 @@ _SEARCH_CAPTURE = re.compile(
     r"(?:^|\b)tìm(?:\s+cho\s+(?:tôi|mình))?\s+(.+?)(?=\s+(?:ở|tại|dưới|tối đa|không quá)\b|$)"
 )
 
+_CITY_VALUE = "(?:" + "|".join(re.escape(marker) for marker, _ in CITY_ALIASES) + ")"
+_CITY_UPDATE = re.compile(
+    rf"(?:(?:(?:tìm(?: sự kiện)? )?(?:ở|tại) |"
+    rf"(?:đổi|chuyển)(?: thành phố)? (?:sang|thành) )?{_CITY_VALUE}|"
+    rf"bỏ(?: bộ lọc)? thành phố(?: {_CITY_VALUE})?|mọi thành phố|"
+    rf"tất cả thành phố|không giới hạn thành phố)(?: (?:nhé|ạ|thôi))?[.!?]*"
+)
+
 
 class RuleBasedVietnameseNLU:
     def parse(self, text: str, state: DialogueState) -> Understanding:
@@ -113,8 +121,17 @@ class RuleBasedVietnameseNLU:
             budget_amount = amount
             budget_scope = scope_resolution
 
+        city_continuation = (
+            clear_group is None
+            and state.active_intent in (Intent.SEARCH_EVENT, Intent.TICKET_RECOMMEND)
+            and _CITY_UPDATE.fullmatch(norm) is not None
+        )
+        if city_continuation and state.active_intent is not None:
+            # Only a recognized filter-only turn resumes the active task.
+            # Explicit account/policy requests and unknown text keep their intent.
+            intent = state.active_intent
         search_query = self._extract_search_query(norm) if intent is Intent.SEARCH_EVENT else None
-        if intent is Intent.SEARCH_EVENT and search_query is None:
+        if intent is Intent.SEARCH_EVENT and search_query is None and not city_continuation:
             removed.add(Slot.SEARCH_QUERY)
         patch = DialoguePatch(
             city=city,
@@ -210,7 +227,8 @@ class RuleBasedVietnameseNLU:
             return None
 
         candidate = match.group(1).strip()
-        candidate = re.sub(r"^(?:[1-9]|1\d|20)\s*(?:vé|ghế)\s+", "", candidate)
+        # Use the slot recognizer at any position; bare title numbers stay intact.
+        candidate = " ".join(_QUANTITY.sub(" ", candidate).split())
         candidate = re.sub(r"^sự kiện\s+", "", candidate).strip()
         if candidate in (
             "",
