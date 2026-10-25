@@ -10,6 +10,7 @@ from smartevent_ai.domain.dialogue import (
     ClarificationReason,
     DialogueState,
     Intent,
+    Scope,
 )
 
 
@@ -108,3 +109,47 @@ def test_read_only_limitation_maps_to_guidance() -> None:
 
     assert result.intent == Intent.BOOKING_GUIDANCE
     assert result.patch.quantity == 2
+
+
+def test_peft_nlu_parses_budget_and_case_insensitive_intent() -> None:
+    fake_json = json.dumps(
+        {
+            "primary_intent": "ticket_recommend",
+            "entities": {
+                "budget_amount": 700000,
+                "budget_scope": "PER_TICKET",
+                "city": "Đà Nẵng",
+            },
+        }
+    )
+    nlu = PeftTransformerNLU(generator=FakeGenerator(fake_json))
+    result = nlu.parse("Tìm vé 700k mỗi vé ở Đà Nẵng", DialogueState())
+
+    assert result.intent == Intent.TICKET_RECOMMEND
+    assert result.patch.budget_amount == 700000
+    assert result.patch.budget_scope == Scope.PER_TICKET
+    assert result.patch.active_intent == Intent.TICKET_RECOMMEND
+
+
+def test_peft_nlu_budget_out_of_range_clarifies() -> None:
+    fake_json = json.dumps(
+        {
+            "primary_intent": "TICKET_RECOMMEND",
+            "entities": {
+                "budget_amount": 3_000_000_000,
+            },
+        }
+    )
+    nlu = PeftTransformerNLU(generator=FakeGenerator(fake_json))
+    result = nlu.parse("Vé dưới 3 tỷ", DialogueState())
+
+    assert result.needs_clarification is True
+    assert result.clarification_reason == ClarificationReason.BUDGET_OUT_OF_RANGE
+
+
+def test_peft_nlu_missing_adapter_path_raises_on_load(tmp_path) -> None:
+    import pytest
+
+    missing_nlu = PeftTransformerNLU(adapter_path=tmp_path / "nonexistent")
+    with pytest.raises(FileNotFoundError):
+        missing_nlu._ensure_loaded()

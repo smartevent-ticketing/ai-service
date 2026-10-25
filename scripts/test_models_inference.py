@@ -83,7 +83,7 @@ def run_nlu_tests(adapter_path: Path, use_4bit: bool = True):
         "- primary_intent: Một trong 21 intent theo ontology (SEARCH_EVENT, TICKET_RECOMMEND, BOOKING_GUIDANCE, REFUND_POLICY, ...)\n"
         "- proposed_action: Hành động đề xuất chỉ đọc (SEARCH_EVENTS, GET_TICKET_OPTIONS, ...)\n"
         "- entities: dict chứa các thực thể đã bóc tách (city, quantity, budget_amount, budget_currency, ...)\n"
-        "- state_delta: list các thao tác cập nhật trạng thái hội thoại [{\"operation\": \"SET\", \"slot\": \"...\", \"value\": ...}]\n"
+        '- state_delta: list các thao tác cập nhật trạng thái hội thoại [{"operation": "SET", "slot": "...", "value": ...}]\n'
         "Chỉ xuất duy nhất khối JSON, không giải thích thêm."
     )
 
@@ -97,7 +97,7 @@ def run_nlu_tests(adapter_path: Path, use_4bit: bool = True):
 
     for idx, query in enumerate(test_queries, 1):
         print(f"\n--- [NLU Test {idx}/{len(test_queries)}] ---")
-        print(f"Query: \"{query}\"")
+        print(f'Query: "{query}"')
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -165,7 +165,7 @@ def run_rag_tests(adapter_path: Path, use_4bit: bool = True):
 
     for idx, query in enumerate(test_queries, 1):
         print(f"\n--- [RAG Test {idx}/{len(test_queries)}] ---")
-        print(f"Query: \"{query}\"")
+        print(f'Query: "{query}"')
 
         user_content = f"Ngữ cảnh tài liệu:\n{policy_context}\n\nCâu hỏi: {query}"
         messages = [
@@ -214,7 +214,9 @@ def main():
 
     use_4bit = not args.no_4bit
 
-    print(f"Device: {'CUDA (' + torch.cuda.get_device_name(0) + ')' if torch.cuda.is_available() else 'CPU'}")
+    print(
+        f"Device: {'CUDA (' + torch.cuda.get_device_name(0) + ')' if torch.cuda.is_available() else 'CPU'}"
+    )
     print(f"Quantization: {'4-bit NF4' if use_4bit else 'FP16/FP32'}")
 
     if args.mode in ("nlu", "all"):

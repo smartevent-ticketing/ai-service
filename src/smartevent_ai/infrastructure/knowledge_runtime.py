@@ -56,18 +56,37 @@ class RuntimePolicyReader:
     async def answer(self, query: str) -> PolicyAnswer:
         try:
             config = self._config.load()
-            if not config.enabled:
-                return PolicyAnswer(NO_EVIDENCE)
-            use_case = RetrievePolicy(
-                self._store,
-                BM25Retriever(),
-                SystemClock(),
-                config.max_results,
-                config.max_answer_chars,
-                synthesizer=self._synthesizer,
-            )
+        except KnowledgeError:
+            return PolicyAnswer(NO_EVIDENCE)
+        if not config.enabled:
+            return PolicyAnswer(NO_EVIDENCE)
+
+        use_case = RetrievePolicy(
+            self._store,
+            BM25Retriever(),
+            SystemClock(),
+            config.max_results,
+            config.max_answer_chars,
+            synthesizer=self._synthesizer,
+        )
+        timeout_sec = 25.0 if self._synthesizer is not None else (config.timeout_ms / 1000)
+        try:
             return await asyncio.wait_for(
-                asyncio.to_thread(use_case.answer, query), timeout=config.timeout_ms / 1000
+                asyncio.to_thread(use_case.answer, query), timeout=timeout_sec
             )
-        except (KnowledgeError, TimeoutError):
+        except TimeoutError:
+            # When generative model times out, fallback to pure extractive answer without losing citations
+            try:
+                extractive_use_case = RetrievePolicy(
+                    self._store,
+                    BM25Retriever(),
+                    SystemClock(),
+                    config.max_results,
+                    config.max_answer_chars,
+                    synthesizer=None,
+                )
+                return extractive_use_case.answer(query)
+            except Exception:
+                return PolicyAnswer(NO_EVIDENCE)
+        except KnowledgeError:
             return PolicyAnswer(NO_EVIDENCE)

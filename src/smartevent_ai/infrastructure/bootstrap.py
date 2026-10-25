@@ -58,5 +58,3 @@ def build_chat(settings: Settings) -> tuple[ChatUseCase, ReadOnlyToolGateway]:
         nlu = RuleBasedVietnameseNLU()
 
     return ChatUseCase(nlu, gateway, policies=policies), gateway
-
-

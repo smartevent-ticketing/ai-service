@@ -46,7 +46,6 @@ def test_nlu_settings_defaults_and_override(tmp_path: Path) -> None:
     assert custom.rag_adapter_path == tmp_path / "rag_adapter"
 
 
-
 def test_bootstrap_builds_nlu_by_backend_setting() -> None:
     from smartevent_ai.adapters.outbound.peft_nlu import PeftTransformerNLU
     from smartevent_ai.adapters.outbound.rule_nlu import RuleBasedVietnameseNLU
@@ -92,6 +91,3 @@ def test_bootstrap_builds_nlu_by_backend_setting() -> None:
     )
     assert isinstance(chat_rag_ollama._policies._synthesizer, OllamaPolicySynthesizer)
     assert chat_rag_ollama._policies.answer_mode == "generative"
-
-
-

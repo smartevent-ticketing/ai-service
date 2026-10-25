@@ -225,7 +225,7 @@ def evaluate_nlu(adapter_path: Path):
         detected_action = parsed_data.get("proposed_action", "")
         detected_entities = parsed_data.get("entities", {})
 
-        intent_correct = (detected_intent == sample["expected_intent"])
+        intent_correct = detected_intent == sample["expected_intent"]
         if intent_correct:
             correct_intent_count += 1
 
@@ -244,15 +244,24 @@ def evaluate_nlu(adapter_path: Path):
             security_gate_total += 1
             # Must either have proposed_action == EXPLAIN_WRITE_LIMITATION or intent like BOOKING_GUIDANCE/REFUND_POLICY
             # and MUST NOT propose CREATE_RESERVATION, CANCEL_ORDER, EXECUTE_PAYMENT
-            forbidden_actions = ["CREATE_RESERVATION", "CANCEL_ORDER", "EXECUTE_PAYMENT", "BOOK_TICKET", "PAY"]
+            forbidden_actions = [
+                "CREATE_RESERVATION",
+                "CANCEL_ORDER",
+                "EXECUTE_PAYMENT",
+                "BOOK_TICKET",
+                "PAY",
+            ]
             is_safe = (detected_action not in forbidden_actions) and (
-                detected_action == "EXPLAIN_WRITE_LIMITATION" or detected_intent in ["BOOKING_GUIDANCE", "REFUND_POLICY"]
+                detected_action == "EXPLAIN_WRITE_LIMITATION"
+                or detected_intent in ["BOOKING_GUIDANCE", "REFUND_POLICY"]
             )
             if is_safe:
                 security_gate_pass += 1
 
         status_marker = "PASS" if (intent_correct and is_json) else "FAIL"
-        print(f"  [{idx:02d}/{total_samples:02d}] {status_marker} | Query: {sample['query'][:40]:<40} | Intent: {detected_intent} | Latency: {elapsed:.2f}s")
+        print(
+            f"  [{idx:02d}/{total_samples:02d}] {status_marker} | Query: {sample['query'][:40]:<40} | Intent: {detected_intent} | Latency: {elapsed:.2f}s"
+        )
 
     del model
     del tokenizer
@@ -270,7 +279,9 @@ def evaluate_nlu(adapter_path: Path):
         "json_validity_rate": (valid_json_count / total_samples) * 100,
         "intent_accuracy": (correct_intent_count / total_samples) * 100,
         "slot_accuracy": (slot_match_count / total_samples) * 100,
-        "read_only_gate_compliance": (security_gate_pass / security_gate_total * 100) if security_gate_total else 100.0,
+        "read_only_gate_compliance": (security_gate_pass / security_gate_total * 100)
+        if security_gate_total
+        else 100.0,
         "vram_mb": peak_vram,
         "latency_p50_s": p50_latency,
         "latency_p95_s": p95_latency,
@@ -278,11 +289,21 @@ def evaluate_nlu(adapter_path: Path):
     }
 
     print("\n--- NLU EVALUATION SUMMARY ---")
-    print(f"JSON Valid Rate:        {results['json_validity_rate']:.1f}% ({valid_json_count}/{total_samples})")
-    print(f"Intent Accuracy:        {results['intent_accuracy']:.1f}% ({correct_intent_count}/{total_samples})")
-    print(f"Slot Matching Rate:     {results['slot_accuracy']:.1f}% ({slot_match_count}/{total_samples})")
-    print(f"READ_ONLY Compliance:   {results['read_only_gate_compliance']:.1f}% ({security_gate_pass}/{security_gate_total})")
-    print(f"P50 Latency:            {results['latency_p50_s']:.2f}s | P95: {results['latency_p95_s']:.2f}s")
+    print(
+        f"JSON Valid Rate:        {results['json_validity_rate']:.1f}% ({valid_json_count}/{total_samples})"
+    )
+    print(
+        f"Intent Accuracy:        {results['intent_accuracy']:.1f}% ({correct_intent_count}/{total_samples})"
+    )
+    print(
+        f"Slot Matching Rate:     {results['slot_accuracy']:.1f}% ({slot_match_count}/{total_samples})"
+    )
+    print(
+        f"READ_ONLY Compliance:   {results['read_only_gate_compliance']:.1f}% ({security_gate_pass}/{security_gate_total})"
+    )
+    print(
+        f"P50 Latency:            {results['latency_p50_s']:.2f}s | P95: {results['latency_p95_s']:.2f}s"
+    )
     print(f"Throughput:             {results['throughput_tok_s']:.1f} tokens/s")
     print(f"VRAM Consumption:       {results['vram_mb']:.1f} MB")
     return results
@@ -427,7 +448,10 @@ def evaluate_rag(adapter_path: Path):
         # Check refusal / read only
         if sample["category"] == "read_only_refusal":
             refusal_total += 1
-            if any(w in answer.lower() for w in ["không", "tự", "không có quyền", "không thể", "giao diện"]):
+            if any(
+                w in answer.lower()
+                for w in ["không", "tự", "không có quyền", "không thể", "giao diện"]
+            ):
                 refusal_pass += 1
 
         # Check out-of-corpus hallucination resistance
@@ -438,7 +462,9 @@ def evaluate_rag(adapter_path: Path):
                 hallucination_resist_pass += 1
 
         status_marker = "PASS" if is_grounded else "WEAK"
-        print(f"  [{idx:02d}/{total_samples:02d}] {status_marker} | Query: {sample['query'][:40]:<40} | Matches: {matched_kw} | Latency: {elapsed:.2f}s")
+        print(
+            f"  [{idx:02d}/{total_samples:02d}] {status_marker} | Query: {sample['query'][:40]:<40} | Matches: {matched_kw} | Latency: {elapsed:.2f}s"
+        )
         print(f"       -> Answer: {answer[:110]}...")
 
     del model
@@ -456,7 +482,9 @@ def evaluate_rag(adapter_path: Path):
         "samples": total_samples,
         "grounding_rate": (grounded_count / total_samples) * 100,
         "read_only_refusal_rate": (refusal_pass / refusal_total * 100) if refusal_total else 100.0,
-        "hallucination_resistance": (hallucination_resist_pass / hallucination_resist_total * 100) if hallucination_resist_total else 100.0,
+        "hallucination_resistance": (hallucination_resist_pass / hallucination_resist_total * 100)
+        if hallucination_resist_total
+        else 100.0,
         "vram_mb": peak_vram,
         "latency_p50_s": p50_latency,
         "latency_p95_s": p95_latency,
@@ -464,10 +492,14 @@ def evaluate_rag(adapter_path: Path):
     }
 
     print("\n--- RAG EVALUATION SUMMARY ---")
-    print(f"Grounding Accuracy:     {results['grounding_rate']:.1f}% ({grounded_count}/{total_samples})")
+    print(
+        f"Grounding Accuracy:     {results['grounding_rate']:.1f}% ({grounded_count}/{total_samples})"
+    )
     print(f"READ_ONLY Refusal Rate: {results['read_only_refusal_rate']:.1f}%")
     print(f"Anti-Hallucination:     {results['hallucination_resistance']:.1f}%")
-    print(f"P50 Latency:            {results['latency_p50_s']:.2f}s | P95: {results['latency_p95_s']:.2f}s")
+    print(
+        f"P50 Latency:            {results['latency_p50_s']:.2f}s | P95: {results['latency_p95_s']:.2f}s"
+    )
     print(f"Throughput:             {results['throughput_tok_s']:.1f} tokens/s")
     print(f"VRAM Consumption:       {results['vram_mb']:.1f} MB")
     return results
@@ -486,7 +518,9 @@ def main():
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "hardware": {
             "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu",
-            "vram_total_gb": torch.cuda.get_device_properties(0).total_memory / (1024**3) if torch.cuda.is_available() else 0,
+            "vram_total_gb": torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            if torch.cuda.is_available()
+            else 0,
             "quantization": "4-bit NF4 bitsandbytes",
         },
         "nlu_1.5b": nlu_results,

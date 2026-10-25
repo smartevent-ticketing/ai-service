@@ -11,6 +11,7 @@ from smartevent_ai.domain.dialogue import (
     ClarificationReason,
     DialogueState,
     Intent,
+    Scope,
 )
 
 
@@ -137,3 +138,55 @@ def test_read_only_protection_maps_to_booking_guidance() -> None:
 
     assert result.intent == Intent.BOOKING_GUIDANCE
     assert result.patch.quantity == 2
+
+
+def test_ollama_nlu_parses_budget_and_case_insensitive_intent() -> None:
+    ollama_payload = {
+        "message": {
+            "role": "assistant",
+            "content": json.dumps(
+                {
+                    "primary_intent": "ticket_recommend",
+                    "entities": {
+                        "budget_amount": 500000,
+                        "budget_scope": "TOTAL",
+                        "city": "Hà Nội",
+                    },
+                }
+            ),
+        }
+    }
+    client = make_mock_client(ollama_payload)
+    nlu = OllamaNLU(client=client)
+
+    result = nlu.parse("Tìm vé dưới 500k tổng", DialogueState())
+
+    assert result.intent == Intent.TICKET_RECOMMEND
+    assert result.patch.budget_amount == 500000
+    assert result.patch.budget_scope == Scope.TOTAL
+    assert result.patch.active_intent == Intent.TICKET_RECOMMEND
+
+    nlu.close()
+
+
+def test_ollama_nlu_budget_out_of_range_clarifies() -> None:
+    ollama_payload = {
+        "message": {
+            "role": "assistant",
+            "content": json.dumps(
+                {
+                    "primary_intent": "TICKET_RECOMMEND",
+                    "entities": {
+                        "budget_amount": 2_000_000_000,
+                    },
+                }
+            ),
+        }
+    }
+    client = make_mock_client(ollama_payload)
+    nlu = OllamaNLU(client=client)
+
+    result = nlu.parse("Vé dưới 2 tỷ", DialogueState())
+
+    assert result.needs_clarification is True
+    assert result.clarification_reason == ClarificationReason.BUDGET_OUT_OF_RANGE

@@ -59,4 +59,3 @@ class PolicyReader(Protocol):
 
 class PolicySynthesizer(Protocol):
     def synthesize(self, query: str, context: str) -> str: ...
-

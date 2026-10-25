@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import httpx
 
@@ -64,7 +64,9 @@ class OllamaPolicySynthesizer:
                 return answer
             return context
         except Exception as e:
-            logger.warning("OllamaPolicySynthesizer failed (%s); falling back to extractive context", e)
+            logger.warning(
+                "OllamaPolicySynthesizer failed (%s); falling back to extractive context", e
+            )
             return context
 
 
@@ -82,8 +84,8 @@ class PeftPolicySynthesizer:
         self._base_model_name = base_model_name
         self._load_4bit = load_4bit
         self._generator = generator
-        self._model = None
-        self._tokenizer = None
+        self._model: Any = None
+        self._tokenizer: Any = None
 
     def _ensure_loaded(self) -> None:
         if self._generator is not None or self._model is not None:
@@ -152,5 +154,7 @@ class PeftPolicySynthesizer:
             gen_text = self._tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
             return gen_text or context
         except Exception as e:
-            logger.warning("PeftPolicySynthesizer failed (%s); falling back to extractive context", e)
+            logger.warning(
+                "PeftPolicySynthesizer failed (%s); falling back to extractive context", e
+            )
             return context

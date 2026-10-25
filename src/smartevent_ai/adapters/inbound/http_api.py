@@ -159,8 +159,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "business_tools_enabled": enabled,
             "model_backend": configuration.nlu_backend,
             "policy_retrieval": {
-                "status": chat.policy_status(),
-                "answer_mode": chat.policy_answer_mode(),
+                "status": app.state.chat.policy_status(),
+                "answer_mode": app.state.chat.policy_answer_mode(),
             },
         }
 

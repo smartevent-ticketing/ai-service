@@ -67,7 +67,9 @@ def build_ollama_model(model_name: str, modelfile_name: str) -> None:
             print(f"[OLLAMA] Successfully created model '{model_name}'.")
     except FileNotFoundError:
         print("[ERROR] 'ollama' command not found in PATH.")
-        print("Please install Ollama: https://ollama.com/download or 'winget install Ollama.Ollama'")
+        print(
+            "Please install Ollama: https://ollama.com/download or 'winget install Ollama.Ollama'"
+        )
         sys.exit(1)
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] Failed to create model {model_name}: {e}")

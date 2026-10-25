@@ -50,8 +50,8 @@ class PeftTransformerNLU:
         self._load_4bit = load_4bit
         self._generator = generator
         self._fallback_nlu = RuleBasedVietnameseNLU()
-        self._model = None
-        self._tokenizer = None
+        self._model: Any = None
+        self._tokenizer: Any = None
 
     def _ensure_loaded(self) -> None:
         if self._generator is not None or self._model is not None:
@@ -139,15 +139,22 @@ class PeftTransformerNLU:
             clean_str = self._clean_json_str(raw_response)
             payload: dict[str, Any] = json.loads(clean_str)
 
-            # Intent extraction
-            raw_intent = payload.get("primary_intent", "")
+            # Intent extraction with case-insensitivity
+            raw_intent = str(payload.get("primary_intent", "")).strip().upper()
             try:
                 intent = Intent(raw_intent)
             except ValueError:
-                # Map or fallback if intent is unknown in domain enum
                 intent = Intent.OUT_OF_SCOPE
 
             entities: dict[str, Any] = payload.get("entities") or {}
+
+            # City normalization
+            city = self._normalize_city(entities.get("city"))
+
+            # Search query
+            search_query = entities.get("search_query") or entities.get("event_name")
+            if intent is Intent.SEARCH_EVENT and not search_query:
+                search_query = entities.get("category")
 
             # Quantity extraction and range guard
             quantity = entities.get("quantity")
@@ -156,16 +163,21 @@ class PeftTransformerNLU:
                     qty_int = int(quantity)
                     if not (1 <= qty_int <= 20):
                         return Understanding(
-                            intent=intent if intent != Intent.OUT_OF_SCOPE else Intent.TICKET_RECOMMEND,
+                            intent=intent
+                            if intent != Intent.OUT_OF_SCOPE
+                            else Intent.TICKET_RECOMMEND,
+                            patch=DialoguePatch(
+                                city=city,
+                                event_name=entities.get("event_name"),
+                                search_query=search_query,
+                                active_intent=intent,
+                            ),
                             needs_clarification=True,
                             clarification_reason=ClarificationReason.QUANTITY_OUT_OF_RANGE,
                         )
                     quantity = qty_int
                 except (ValueError, TypeError):
                     quantity = None
-
-            # City normalization
-            city = self._normalize_city(entities.get("city"))
 
             # Budget extraction
             budget_amount = entities.get("budget_amount")
@@ -175,6 +187,13 @@ class PeftTransformerNLU:
                     if not (0 <= b_int <= MAX_BUDGET_VND):
                         return Understanding(
                             intent=intent,
+                            patch=DialoguePatch(
+                                city=city,
+                                quantity=quantity,
+                                event_name=entities.get("event_name"),
+                                search_query=search_query,
+                                active_intent=intent,
+                            ),
                             needs_clarification=True,
                             clarification_reason=ClarificationReason.BUDGET_OUT_OF_RANGE,
                         )
@@ -192,11 +211,6 @@ class PeftTransformerNLU:
             if proposed_action == "EXPLAIN_WRITE_LIMITATION" or "giữ vé" in text.lower():
                 intent = Intent.BOOKING_GUIDANCE
 
-            search_query = entities.get("search_query") or entities.get("event_name")
-            if intent is Intent.SEARCH_EVENT and not search_query:
-                # If search query not captured in entities, check category or preserve
-                search_query = entities.get("category")
-
             patch = DialoguePatch(
                 city=city,
                 quantity=quantity,
@@ -204,6 +218,7 @@ class PeftTransformerNLU:
                 budget_scope=budget_scope if budget_amount is not None else None,
                 event_name=entities.get("event_name"),
                 search_query=search_query,
+                active_intent=intent,
             )
             return Understanding(intent=intent, patch=patch)
 

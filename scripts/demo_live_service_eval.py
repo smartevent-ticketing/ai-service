@@ -112,7 +112,7 @@ def evaluate_live_service():
 
     for idx, sc in enumerate(scenarios, 1):
         print(f"\n[{idx}/5] Scenario: {sc['title']}")
-        print(f"User Message: \"{sc['request']['message']}\"")
+        print(f'User Message: "{sc["request"]["message"]}"')
 
         t_req = time.time()
         resp = client.post("/api/v1/chat", json=sc["request"])
@@ -128,23 +128,25 @@ def evaluate_live_service():
         print(f"Grounding: {data['grounding']}")
 
         exp = sc["expectations"]
-        intent_match = (data["intent"] == exp.get("intent", data["intent"]))
+        intent_match = data["intent"] == exp.get("intent", data["intent"])
         print(f"Evaluation: {'[PASS]' if intent_match else '[FAIL]'}")
 
-        results.append({
-            "scenario": sc["title"],
-            "latency_s": round(elapsed, 2),
-            "status": "PASS" if intent_match else "FAIL",
-            "intent": data["intent"],
-            "state": data["state"],
-        })
+        results.append(
+            {
+                "scenario": sc["title"],
+                "latency_s": round(elapsed, 2),
+                "status": "PASS" if intent_match else "FAIL",
+                "intent": data["intent"],
+                "state": data["state"],
+            }
+        )
 
     print("\n" + "=" * 70)
     print("FINAL SUMMARY REPORT")
     print("=" * 70)
     pass_count = sum(1 for r in results if r["status"] == "PASS")
-    print(f"Passed Scenarios: {pass_count}/{len(results)} ({pass_count/len(results)*100:.1f}%)")
-    print(f"Average Latency : {sum(r['latency_s'] for r in results)/len(results):.2f}s")
+    print(f"Passed Scenarios: {pass_count}/{len(results)} ({pass_count / len(results) * 100:.1f}%)")
+    print(f"Average Latency : {sum(r['latency_s'] for r in results) / len(results):.2f}s")
     print(f"Model Backend   : {ready_res['model_backend']}")
     print("READ_ONLY Gate  : ENFORCED (Zero mutation endpoints exposed)")
 

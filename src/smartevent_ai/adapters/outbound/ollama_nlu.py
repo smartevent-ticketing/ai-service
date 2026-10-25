@@ -52,6 +52,9 @@ class OllamaNLU:
         self._client = client or httpx.Client(timeout=timeout)
         self._fallback_nlu = RuleBasedVietnameseNLU()
 
+    def close(self) -> None:
+        self._client.close()
+
     def _normalize_city(self, city: str | None) -> str | None:
         if not city:
             return None
@@ -92,14 +95,22 @@ class OllamaNLU:
             clean_str = self._clean_json_str(raw_content)
             data: dict[str, Any] = json.loads(clean_str)
 
-            # Intent extraction
-            raw_intent = data.get("primary_intent", "")
+            # Intent extraction with case-insensitivity
+            raw_intent = str(data.get("primary_intent", "")).strip().upper()
             try:
                 intent = Intent(raw_intent)
             except ValueError:
                 intent = Intent.OUT_OF_SCOPE
 
             entities: dict[str, Any] = data.get("entities") or {}
+
+            # City normalization
+            city = self._normalize_city(entities.get("city"))
+
+            # Search query
+            search_query = entities.get("search_query") or entities.get("event_name")
+            if intent is Intent.SEARCH_EVENT and not search_query:
+                search_query = entities.get("category")
 
             # Quantity extraction and range check
             quantity = entities.get("quantity")
@@ -108,16 +119,21 @@ class OllamaNLU:
                     qty_int = int(quantity)
                     if not (1 <= qty_int <= 20):
                         return Understanding(
-                            intent=intent if intent != Intent.OUT_OF_SCOPE else Intent.TICKET_RECOMMEND,
+                            intent=intent
+                            if intent != Intent.OUT_OF_SCOPE
+                            else Intent.TICKET_RECOMMEND,
+                            patch=DialoguePatch(
+                                city=city,
+                                event_name=entities.get("event_name"),
+                                search_query=search_query,
+                                active_intent=intent,
+                            ),
                             needs_clarification=True,
                             clarification_reason=ClarificationReason.QUANTITY_OUT_OF_RANGE,
                         )
                     quantity = qty_int
                 except (ValueError, TypeError):
                     quantity = None
-
-            # City normalization
-            city = self._normalize_city(entities.get("city"))
 
             # Budget amount and scope
             budget_amount = entities.get("budget_amount")
@@ -127,6 +143,13 @@ class OllamaNLU:
                     if not (0 <= b_int <= MAX_BUDGET_VND):
                         return Understanding(
                             intent=intent,
+                            patch=DialoguePatch(
+                                city=city,
+                                quantity=quantity,
+                                event_name=entities.get("event_name"),
+                                search_query=search_query,
+                                active_intent=intent,
+                            ),
                             needs_clarification=True,
                             clarification_reason=ClarificationReason.BUDGET_OUT_OF_RANGE,
                         )
@@ -144,10 +167,6 @@ class OllamaNLU:
             if proposed_action == "EXPLAIN_WRITE_LIMITATION" or "giữ vé" in text.lower():
                 intent = Intent.BOOKING_GUIDANCE
 
-            search_query = entities.get("search_query") or entities.get("event_name")
-            if intent is Intent.SEARCH_EVENT and not search_query:
-                search_query = entities.get("category")
-
             patch = DialoguePatch(
                 city=city,
                 quantity=quantity,
@@ -155,6 +174,7 @@ class OllamaNLU:
                 budget_scope=budget_scope if budget_amount is not None else None,
                 event_name=entities.get("event_name"),
                 search_query=search_query,
+                active_intent=intent,
             )
             return Understanding(intent=intent, patch=patch)
 

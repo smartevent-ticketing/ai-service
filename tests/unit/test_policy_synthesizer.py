@@ -4,6 +4,7 @@ from __future__ import annotations
 
 
 import httpx
+import pytest
 
 from smartevent_ai.adapters.outbound.knowledge.policy_synthesizer import (
     OllamaPolicySynthesizer,
@@ -105,3 +106,32 @@ def test_retrieve_policy_delegates_to_synthesizer_when_provided(tmp_path) -> Non
     # Citations must be preserved!
     assert answer_gen.citations == answer_ext.citations
 
+
+def test_ollama_synthesizer_empty_response_returns_context() -> None:
+    client = make_mock_client("")
+    synthesizer = OllamaPolicySynthesizer(client=client)
+    res = synthesizer.synthesize("test", "[1] Context passage")
+    assert res == "[1] Context passage"
+
+
+def test_peft_synthesizer_with_generator_success_and_fallback(tmp_path) -> None:
+    from smartevent_ai.adapters.outbound.knowledge.policy_synthesizer import (
+        PeftPolicySynthesizer,
+    )
+
+    # Success case with generator
+    synth = PeftPolicySynthesizer(generator=lambda p: "GENERATED ANSWER")
+    res = synth.synthesize("query", "context")
+    assert res == "GENERATED ANSWER"
+
+    # Generator error falls back to context
+    def err_gen(p: str) -> str:
+        raise RuntimeError("GPU fail")
+
+    synth_err = PeftPolicySynthesizer(generator=err_gen)
+    assert synth_err.synthesize("query", "context") == "context"
+
+    # Missing adapter path raises on ensure_loaded
+    missing_synth = PeftPolicySynthesizer(adapter_path=tmp_path / "nonexistent")
+    with pytest.raises(FileNotFoundError):
+        missing_synth._ensure_loaded()
