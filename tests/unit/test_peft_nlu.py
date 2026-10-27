@@ -153,3 +153,30 @@ def test_peft_nlu_missing_adapter_path_raises_on_load(tmp_path) -> None:
     missing_nlu = PeftTransformerNLU(adapter_path=tmp_path / "nonexistent")
     with pytest.raises(FileNotFoundError):
         missing_nlu._ensure_loaded()
+
+
+def test_peft_nlu_resolves_budget_scope_with_previous_state() -> None:
+    fake_json = json.dumps(
+        {
+            "primary_intent": "TICKET_RECOMMEND",
+            "entities": {"budget_scope": "PER_TICKET"},
+        }
+    )
+    fake_gen = FakeGenerator(fake_json)
+    nlu = PeftTransformerNLU(generator=fake_gen)
+    prev_state = DialogueState(
+        active_intent=Intent.TICKET_RECOMMEND,
+        city="Đà Nẵng",
+        quantity=1,
+        budget_amount=300_000,
+        event_name="EDM Night",
+    )
+    result = nlu.parse("mỗi vé", prev_state)
+
+    assert fake_gen.last_prompt is not None
+    assert "Trạng thái trước:" in fake_gen.last_prompt
+    assert "active_intent: TICKET_RECOMMEND" in fake_gen.last_prompt
+    assert "city: Đà Nẵng" in fake_gen.last_prompt
+    assert "budget_amount: 300000" in fake_gen.last_prompt
+    assert "event_name: EDM Night" in fake_gen.last_prompt
+    assert result.patch.budget_scope == Scope.PER_TICKET

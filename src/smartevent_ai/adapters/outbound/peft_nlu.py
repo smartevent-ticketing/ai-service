@@ -59,8 +59,9 @@ class PeftTransformerNLU:
         if self._adapter_path is None or not self._adapter_path.exists():
             raise FileNotFoundError(f"Adapter path not found: {self._adapter_path}")
 
-        import torch
-        from peft import PeftModel
+        import torch as _torch  # type: ignore[import-untyped]
+        torch_any: Any = _torch
+        from peft import PeftModel  # type: ignore[import-not-found]
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
         self._tokenizer = AutoTokenizer.from_pretrained(
@@ -70,10 +71,10 @@ class PeftTransformerNLU:
             self._tokenizer.pad_token = self._tokenizer.eos_token
 
         quant_config = None
-        if torch.cuda.is_available() and self._load_4bit:
+        if torch_any.cuda.is_available() and self._load_4bit:
             quant_config = BitsAndBytesConfig(
                 load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_compute_dtype=torch_any.float16,
                 bnb_4bit_quant_type="nf4",
                 bnb_4bit_use_double_quant=True,
             )
@@ -81,32 +82,62 @@ class PeftTransformerNLU:
         base = AutoModelForCausalLM.from_pretrained(
             self._base_model_name,
             quantization_config=quant_config,
-            device_map="auto" if torch.cuda.is_available() else "cpu",
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            device_map="auto" if torch_any.cuda.is_available() else "cpu",
+            torch_dtype=torch_any.float16 if torch_any.cuda.is_available() else torch_any.float32,
             trust_remote_code=True,
         )
         self._model = PeftModel.from_pretrained(base, str(self._adapter_path))
         self._model.eval()
 
-    def _generate(self, user_text: str) -> str:
+    def _generate(self, user_text: str, state: DialogueState | None = None) -> str:
+        user_content = user_text
+        if state is not None and (
+            state.active_intent is not None
+            or state.city
+            or state.quantity
+            or state.budget_amount is not None
+            or state.event_name
+            or state.search_query
+        ):
+            context_parts = []
+            if state.active_intent:
+                context_parts.append(f"active_intent: {state.active_intent.value}")
+            if state.city:
+                context_parts.append(f"city: {state.city}")
+            if state.quantity:
+                context_parts.append(f"quantity: {state.quantity}")
+            if state.budget_amount is not None:
+                context_parts.append(f"budget_amount: {state.budget_amount}")
+            if state.budget_scope and state.budget_scope is not Scope.UNKNOWN:
+                context_parts.append(f"budget_scope: {state.budget_scope.value}")
+            if state.event_name:
+                context_parts.append(f"event_name: {state.event_name}")
+            if state.search_query:
+                context_parts.append(f"search_query: {state.search_query}")
+            user_content = (
+                f"Trạng thái trước:\n{{{', '.join(context_parts)}}}\n\n"
+                f"Tin nhắn người dùng: {user_text}"
+            )
+
         if self._generator is not None:
-            return self._generator(user_text)
+            return self._generator(user_content)
 
         self._ensure_loaded()
         assert self._tokenizer is not None and self._model is not None
 
-        import torch
+        import torch as _torch
+        torch_any: Any = _torch
 
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_text},
+            {"role": "user", "content": user_content},
         ]
         prompt = self._tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True
         )
         inputs = self._tokenizer(prompt, return_tensors="pt").to(self._model.device)
 
-        with torch.no_grad():
+        with torch_any.no_grad():
             output_tokens = self._model.generate(
                 **inputs,
                 max_new_tokens=256,
@@ -135,7 +166,7 @@ class PeftTransformerNLU:
 
     def parse(self, text: str, state: DialogueState) -> Understanding:
         try:
-            raw_response = self._generate(text)
+            raw_response = self._generate(text, state)
             clean_str = self._clean_json_str(raw_response)
             payload: dict[str, Any] = json.loads(clean_str)
 
@@ -211,11 +242,20 @@ class PeftTransformerNLU:
             if proposed_action == "EXPLAIN_WRITE_LIMITATION" or "giữ vé" in text.lower():
                 intent = Intent.BOOKING_GUIDANCE
 
+            effective_budget = (
+                budget_amount if budget_amount is not None else state.budget_amount
+            )
+            resolved_scope = (
+                budget_scope
+                if effective_budget is not None and budget_scope is not Scope.UNKNOWN
+                else None
+            )
+
             patch = DialoguePatch(
                 city=city,
                 quantity=quantity,
                 budget_amount=budget_amount,
-                budget_scope=budget_scope if budget_amount is not None else None,
+                budget_scope=resolved_scope,
                 event_name=entities.get("event_name"),
                 search_query=search_query,
                 active_intent=intent,

@@ -24,12 +24,13 @@ _INJECTION = re.compile(
 
 _STOP = frozenset(
     "toi muon hoi la gi cai nay kia va hoac cua trong voi cho co khong nao a nhe "
-    "xin biet ve duoc".split()
+    "xin biet duoc deu".split()
 )
 
 
 def _normalize(text: str) -> str:
-    normalized = unicodedata.normalize("NFD", text.lower().replace("đ", "d"))
+    cleaned = re.sub(r"\bvề\b", " ", text, flags=re.IGNORECASE)
+    normalized = unicodedata.normalize("NFD", cleaned.lower().replace("đ", "d"))
     return " ".join("".join(c for c in normalized if not unicodedata.combining(c)).split())
 
 

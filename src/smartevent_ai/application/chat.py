@@ -1,5 +1,6 @@
 """Chat orchestration use case with inward-facing dependencies only."""
 
+import asyncio
 from uuid import UUID, uuid4
 
 from smartevent_ai.application.models import ChatCommand, ChatResult
@@ -33,7 +34,9 @@ class ChatUseCase:
         return getattr(self._policies, "answer_mode", "extractive")
 
     async def handle(self, request: ChatCommand) -> ChatResult:
-        understood = self._nlu.parse(request.message, request.previous_state)
+        understood = await asyncio.to_thread(
+            self._nlu.parse, request.message, request.previous_state
+        )
         state = merge_state(request.previous_state, understood.patch)
         conversation_id = request.conversation_id or uuid4()
 

@@ -67,6 +67,12 @@ def test_classifier_never_raises_but_drops_on_crash() -> None:
     assert classify("hoàn tiền?", Exploding()) is EvidenceVerdict.DROPPED  # type: ignore[arg-type]
 
 
+def test_query_with_ve_retains_evidence() -> None:
+    chunk = _chunk("Chính sách vé: hoàn tiền vé trong vòng 7 ngày.")
+    assert classify("Hỏi vé", chunk) is EvidenceVerdict.KEPT
+    assert classify("Chính sách về vé", chunk) is EvidenceVerdict.KEPT
+
+
 @pytest.mark.parametrize(
     "query",
     [

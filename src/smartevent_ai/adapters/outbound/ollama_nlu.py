@@ -74,11 +74,40 @@ class OllamaNLU:
     def parse(self, text: str, state: DialogueState) -> Understanding:
         try:
             url = f"{self._base_url}/api/chat"
+            user_content = text
+            if (
+                state.active_intent is not None
+                or state.city
+                or state.quantity
+                or state.budget_amount is not None
+                or state.event_name
+                or state.search_query
+            ):
+                context_parts = []
+                if state.active_intent:
+                    context_parts.append(f"active_intent: {state.active_intent.value}")
+                if state.city:
+                    context_parts.append(f"city: {state.city}")
+                if state.quantity:
+                    context_parts.append(f"quantity: {state.quantity}")
+                if state.budget_amount is not None:
+                    context_parts.append(f"budget_amount: {state.budget_amount}")
+                if state.budget_scope and state.budget_scope is not Scope.UNKNOWN:
+                    context_parts.append(f"budget_scope: {state.budget_scope.value}")
+                if state.event_name:
+                    context_parts.append(f"event_name: {state.event_name}")
+                if state.search_query:
+                    context_parts.append(f"search_query: {state.search_query}")
+                user_content = (
+                    f"Trạng thái trước:\n{{{', '.join(context_parts)}}}\n\n"
+                    f"Tin nhắn người dùng: {text}"
+                )
+
             payload = {
                 "model": self._model,
                 "messages": [
                     {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": text},
+                    {"role": "user", "content": user_content},
                 ],
                 "format": "json",
                 "stream": False,
@@ -167,11 +196,20 @@ class OllamaNLU:
             if proposed_action == "EXPLAIN_WRITE_LIMITATION" or "giữ vé" in text.lower():
                 intent = Intent.BOOKING_GUIDANCE
 
+            effective_budget = (
+                budget_amount if budget_amount is not None else state.budget_amount
+            )
+            resolved_scope = (
+                budget_scope
+                if effective_budget is not None and budget_scope is not Scope.UNKNOWN
+                else None
+            )
+
             patch = DialoguePatch(
                 city=city,
                 quantity=quantity,
                 budget_amount=budget_amount,
-                budget_scope=budget_scope if budget_amount is not None else None,
+                budget_scope=resolved_scope,
                 event_name=entities.get("event_name"),
                 search_query=search_query,
                 active_intent=intent,

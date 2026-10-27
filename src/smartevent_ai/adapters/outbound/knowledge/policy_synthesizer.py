@@ -93,8 +93,9 @@ class PeftPolicySynthesizer:
         if self._adapter_path is None or not self._adapter_path.exists():
             raise FileNotFoundError(f"RAG adapter path not found: {self._adapter_path}")
 
-        import torch
-        from peft import PeftModel
+        import torch as _torch  # type: ignore[import-untyped]
+        torch_any: Any = _torch
+        from peft import PeftModel  # type: ignore[import-not-found]
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
         self._tokenizer = AutoTokenizer.from_pretrained(
@@ -104,10 +105,10 @@ class PeftPolicySynthesizer:
             self._tokenizer.pad_token = self._tokenizer.eos_token
 
         quant_config = None
-        if torch.cuda.is_available() and self._load_4bit:
+        if torch_any.cuda.is_available() and self._load_4bit:
             quant_config = BitsAndBytesConfig(
                 load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_compute_dtype=torch_any.float16,
                 bnb_4bit_quant_type="nf4",
                 bnb_4bit_use_double_quant=True,
             )
@@ -115,8 +116,8 @@ class PeftPolicySynthesizer:
         base = AutoModelForCausalLM.from_pretrained(
             self._base_model_name,
             quantization_config=quant_config,
-            device_map="auto" if torch.cuda.is_available() else "cpu",
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            device_map="auto" if torch_any.cuda.is_available() else "cpu",
+            torch_dtype=torch_any.float16 if torch_any.cuda.is_available() else torch_any.float32,
             trust_remote_code=True,
         )
         self._model = PeftModel.from_pretrained(base, str(self._adapter_path))
@@ -130,7 +131,8 @@ class PeftPolicySynthesizer:
             self._ensure_loaded()
             assert self._tokenizer is not None and self._model is not None
 
-            import torch
+            import torch as _torch
+            torch_any: Any = _torch
 
             user_content = f"Ngữ cảnh tài liệu:\n{context}\n\nCâu hỏi: {query}"
             messages = [
@@ -142,7 +144,7 @@ class PeftPolicySynthesizer:
             )
             inputs = self._tokenizer(prompt, return_tensors="pt").to(self._model.device)
 
-            with torch.no_grad():
+            with torch_any.no_grad():
                 output_tokens = self._model.generate(
                     **inputs,
                     max_new_tokens=300,

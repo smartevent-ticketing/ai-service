@@ -190,3 +190,45 @@ def test_ollama_nlu_budget_out_of_range_clarifies() -> None:
 
     assert result.needs_clarification is True
     assert result.clarification_reason == ClarificationReason.BUDGET_OUT_OF_RANGE
+
+
+def test_ollama_nlu_includes_previous_state_in_prompt_and_resolves_budget_scope() -> None:
+    captured_payload = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_payload
+        captured_payload = json.loads(request.content.decode("utf-8"))
+        response_content = json.dumps(
+            {
+                "primary_intent": "TICKET_RECOMMEND",
+                "entities": {
+                    "budget_scope": "PER_TICKET",
+                },
+            }
+        )
+        return httpx.Response(
+            status_code=200,
+            content=json.dumps({"message": {"role": "assistant", "content": response_content}}).encode("utf-8"),
+            request=request,
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    nlu = OllamaNLU(client=client)
+
+    prev_state = DialogueState(
+        active_intent=Intent.TICKET_RECOMMEND,
+        city="Hà Nội",
+        quantity=2,
+        budget_amount=500_000,
+        search_query="Rock concert",
+    )
+    result = nlu.parse("mỗi vé", prev_state)
+
+    assert captured_payload is not None
+    user_msg = captured_payload["messages"][1]["content"]
+    assert "Trạng thái trước:" in user_msg
+    assert "active_intent: TICKET_RECOMMEND" in user_msg
+    assert "city: Hà Nội" in user_msg
+    assert "budget_amount: 500000" in user_msg
+    assert result.patch.budget_scope == Scope.PER_TICKET
+
