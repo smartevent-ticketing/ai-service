@@ -16,6 +16,10 @@ python scripts/knowledge_smoke.py --output artifacts/knowledge-demo
 
 1. Review nội dung trong `datasets/knowledge_drafts/` cùng chủ chính sách. Không
    ingest `manifest.draft.json`; các trường phê duyệt/thời hiệu đang để trống.
+   Theo xác nhận chủ dự án ngày 18/10/2026, nguồn chính sách sản phẩm chuẩn phải
+   được công bố trên website SmartEvent. Tệp nháp, mẫu biên tập và nội dung chat
+   chưa thay thế trang web; cần URL canonical HTTPS đã được xác minh. Quyền dùng
+   URI `approved://` trong schema hiện có không tự đáp ứng yêu cầu công bố này.
 2. Tạo catalog theo `configs/schemas/rag_catalog.schema.json`. Mỗi source có đường
    dẫn tương đối dưới corpus root, checksum byte gốc, title, canonical URI, version,
    owner/reviewer, hồ sơ approval, audience và thời hiệu có timezone.
@@ -24,6 +28,14 @@ python scripts/knowledge_smoke.py --output artifacts/knowledge-demo
    và một chuỗi approval ID tự khai không phải bằng chứng pháp lý hay chữ ký số.
 4. Xác định tokenizer/model profile và checksum từ asset đã được review. Không
    để model weights, corpus thật, catalog có thông tin nội bộ hoặc index vào Git.
+
+Phạm vi mong muốn bao gồm cả quy định sự kiện/nhà tổ chức. Runtime hiện chỉ có
+metadata nguồn chung, chưa có event_id/organizer_id hay bộ lọc phạm vi truy vấn.
+Trước khi ingest quy định riêng để phục vụ chat, phải thiết kế schema/port/filter
+và kiểm thử không lấy chính sách sự kiện A để trả lời cho B; không coi scope ghi
+trong tiêu đề là cơ chế kiểm soát đủ. Thứ tự ưu tiên giữa chính sách chung/riêng
+chưa chốt thì giữ trạng thái chưa xác định khi có mâu thuẫn. Mẫu
+`datasets/knowledge_drafts/templates/event_policy.template.md` không phải nguồn.
 
 ## Build
 

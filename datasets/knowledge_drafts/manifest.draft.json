@@ -1,73 +1,102 @@
 {
+  "canonical_website_origin": null,
   "created_date": "2026-10-18",
   "format": "DRAFT_SOURCE_LIST_NOT_INGEST_CATALOG",
+  "policy_precedence": "UNRESOLVED",
   "runtime_enable_authorized": false,
+  "source_authority": "official_smartevent_website_only",
   "sources": [
     {
       "approved_at": null,
-      "canonical_uri": "approved://drafts/01_gioi_han_tro_ly",
-      "content_sha256": "c1ef84b05dfa66551a1ac69b15a4e4bb1a9677a9215a7729790a0bd0b8b525f1",
+      "canonical_uri": null,
+      "content_sha256": "5efd4c255c2318b0c7730510ddd9ca84872e86eda94c1783d69037bf02a696fb",
       "effective_from": null,
       "effective_until": null,
       "owner": null,
       "path": "01_gioi_han_tro_ly.md",
+      "publication_status": "not_published",
+      "requires_web_publication": true,
       "reviewer": null,
       "source_id": "DRAFT-01",
       "status": "draft",
-      "version": "0.1.0-draft"
+      "version": "0.2.0-draft"
     },
     {
       "approved_at": null,
-      "canonical_uri": "approved://drafts/02_tim_su_kien_va_ton_kho",
-      "content_sha256": "a674d02d4967d4a277cb86d2c2b34fc4f23efa4ecb1b93ab7e37a51eb3cb553c",
+      "canonical_uri": null,
+      "content_sha256": "5ddbfbc71480c4ea421b501dcfa5974cf42b8af9c452b254978fe657652edaf4",
       "effective_from": null,
       "effective_until": null,
       "owner": null,
       "path": "02_tim_su_kien_va_ton_kho.md",
+      "publication_status": "not_published",
+      "requires_web_publication": true,
       "reviewer": null,
       "source_id": "DRAFT-02",
       "status": "draft",
-      "version": "0.1.0-draft"
+      "version": "0.2.0-draft"
     },
     {
       "approved_at": null,
-      "canonical_uri": "approved://drafts/03_hoi_thoai_va_du_lieu",
+      "canonical_uri": null,
       "content_sha256": "01033df60ee092cbb38936b1a7369f58255bb72e26de7af2bb2ecd4e42984b11",
       "effective_from": null,
       "effective_until": null,
       "owner": null,
       "path": "03_hoi_thoai_va_du_lieu.md",
+      "publication_status": "not_published",
+      "requires_web_publication": true,
       "reviewer": null,
       "source_id": "DRAFT-03",
       "status": "draft",
-      "version": "0.1.0-draft"
+      "version": "0.2.0-draft"
     },
     {
       "approved_at": null,
-      "canonical_uri": "approved://drafts/04_hoan_tien_va_ho_tro",
-      "content_sha256": "cbb9233a5832b95cf5570875818efd20faa405608392f0ff89bd3e640d9e5628",
+      "canonical_uri": null,
+      "content_sha256": "c2803f046fbb93eccc9d1968f1b0d9e3cf31e0683e75086b907f4d3d17bdf7d0",
       "effective_from": null,
       "effective_until": null,
       "owner": null,
       "path": "04_hoan_tien_va_ho_tro.md",
+      "publication_status": "not_published",
+      "requires_web_publication": true,
       "reviewer": null,
       "source_id": "DRAFT-04",
       "status": "draft",
-      "version": "0.1.0-draft"
+      "version": "0.2.0-draft"
     },
     {
       "approved_at": null,
-      "canonical_uri": "approved://drafts/05_huong_dan_thao_tac",
-      "content_sha256": "52f687431941b1e8d07c8671e9c1c7702d870c3dde2d0b874f63331005ca8bbf",
+      "canonical_uri": null,
+      "content_sha256": "cd8bba463da0b1301622be8270ccae762068d0926cdceccda1a936775705d0be",
       "effective_from": null,
       "effective_until": null,
       "owner": null,
       "path": "05_huong_dan_thao_tac.md",
+      "publication_status": "not_published",
+      "requires_web_publication": true,
       "reviewer": null,
       "source_id": "DRAFT-05",
       "status": "draft",
-      "version": "0.1.0-draft"
+      "version": "0.2.0-draft"
+    },
+    {
+      "approved_at": null,
+      "canonical_uri": null,
+      "content_sha256": "6c949c225e8837df00c466082f9b041e345d5a0babb67c3df4dd2b0101a4b729",
+      "effective_from": null,
+      "effective_until": null,
+      "owner": null,
+      "path": "06_dieu_khoan_su_dung.md",
+      "publication_status": "not_published",
+      "requires_web_publication": true,
+      "reviewer": null,
+      "source_id": "DRAFT-06",
+      "status": "draft",
+      "version": "0.2.0-draft"
     }
   ],
-  "status": "draft"
+  "status": "draft",
+  "updated_date": "2026-10-18"
 }

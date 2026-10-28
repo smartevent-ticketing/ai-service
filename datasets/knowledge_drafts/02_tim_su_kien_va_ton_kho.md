@@ -13,6 +13,18 @@ Các công cụ đọc dữ liệu nghiệp vụ của foundation mặc định 
 Trợ lý có thể nhận diện nhu cầu nhưng không tự tạo tên sự kiện, giá hay số lượng
 vé còn lại khi chưa xác minh dữ liệu backend.
 
+## Quy định riêng của từng sự kiện được lấy ở đâu?
+
+Xem thông tin sự kiện và quy định của nhà tổ chức được công bố trên website
+SmartEvent. Mỗi quy định riêng chỉ được giải thích trong đúng phạm vi sự kiện
+hoặc nhà tổ chức được ghi trong nguồn. Không dùng quy định của một sự kiện để
+trả lời cho sự kiện khác.
+
+Nếu chưa biết bạn đang hỏi sự kiện nào, trợ lý cần hỏi lại. Nếu không có nguồn
+chính thức hoặc các quy định mâu thuẫn, trợ lý phải nói rõ chưa đủ căn cứ kết
+luận và hướng dẫn bạn gửi biểu mẫu hỗ trợ trên website SmartEvent. Thứ tự ưu
+tiên giữa quy định chung và riêng hiện còn chờ chủ chính sách xác nhận.
+
 ## Danh sách hiển thị có bao gồm toàn bộ vé còn bán không?
 
 Không được suy ra điều đó từ danh sách bị giới hạn hoặc chưa đọc hết các trang.
