@@ -103,6 +103,11 @@ def demo(output: Path, now: datetime | None = None) -> dict[str, object]:
 
 
 if __name__ == "__main__":
+    import sys
+
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if callable(reconfigure):
+        reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     print(json.dumps(demo(parser.parse_args().output), ensure_ascii=False, indent=2))
