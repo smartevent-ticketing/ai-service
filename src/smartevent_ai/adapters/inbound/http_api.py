@@ -102,6 +102,13 @@ class CitationDTO(BaseModel):
     end: int
 
 
+class ChatEventLinkDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    event_id: UUID
+    title: str = Field(min_length=1, max_length=255)
+    slug: str = Field(min_length=1, max_length=255)
+
+
 class ChatResponseDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -112,6 +119,7 @@ class ChatResponseDTO(BaseModel):
     grounding: str
     tool_called: str | None = None
     citations: list[CitationDTO] = Field(default_factory=list)
+    event_links: list[ChatEventLinkDTO] = Field(default_factory=list)
 
     @classmethod
     def from_result(cls, result: ChatResult) -> "ChatResponseDTO":
@@ -122,6 +130,10 @@ class ChatResponseDTO(BaseModel):
             answer=result.answer,
             grounding=result.grounding.value,
             tool_called=result.tool_called,
+            event_links=[
+                ChatEventLinkDTO(event_id=UUID(e.event_id), title=e.title, slug=e.slug)
+                for e in result.event_links
+            ],
             citations=[
                 CitationDTO(
                     source_id=c.source_id,
@@ -155,7 +167,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "status": "degraded" if not enabled else "ready",
             "business_tools_enabled": enabled,
             "model_backend": "rule_based_baseline_only",
-            "policy_retrieval": {"status": chat.policy_status(), "answer_mode": "extractive"},
+            "policy_retrieval": {
+                "status": chat.policy_status(),
+                "answer_mode": "extractive",
+                "backend": "bm25",
+                "vector_store": None,
+                "semantic_enabled": False,
+            },
         }
 
     @app.post("/api/v1/chat", response_model=ChatResponseDTO)

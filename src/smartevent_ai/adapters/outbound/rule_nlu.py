@@ -7,6 +7,7 @@ crash the HTTP boundary. It emits typed domain values only.
 from __future__ import annotations
 
 import re
+import unicodedata
 from decimal import Decimal, InvalidOperation, localcontext
 
 from smartevent_ai.domain.dialogue import (
@@ -27,15 +28,31 @@ CITY_ALIASES: tuple[tuple[str, str], ...] = (
     ("hồ chí minh", "Hồ Chí Minh"),
     ("tp hcm", "Hồ Chí Minh"),
     ("tp. hcm", "Hồ Chí Minh"),
+    ("tphcm", "Hồ Chí Minh"),
+    ("hcm", "Hồ Chí Minh"),
     ("sài gòn", "Hồ Chí Minh"),
     ("đà nẵng", "Đà Nẵng"),
+    ("huế", "Huế"),
+    ("đà lạt", "Đà Lạt"),
+    ("cần thơ", "Cần Thơ"),
+    ("hải phòng", "Hải Phòng"),
+    ("nha trang", "Nha Trang"),
+    ("vũng tàu", "Vũng Tàu"),
+    ("quy nhơn", "Quy Nhơn"),
 )
 
-_QUANTITY = re.compile(r"(?<![\w.,])(-?\d+(?:[.,]\d+)?)\s*(?:vé|ghế)(?!\w)")
-_MONEY = re.compile(r"(?:dưới|tối đa|không quá)\s*(-?\d+(?:[.,]\d+)?)\s*(triệu|tr|nghìn|ngàn|k)\b")
-_SEARCH_CAPTURE = re.compile(
-    r"(?:^|\b)tìm(?:\s+cho\s+(?:tôi|mình))?\s+(.+?)(?=\s+(?:ở|tại|dưới|tối đa|không quá)\b|$)"
+_QUANTITY = re.compile(r"(?<![\w.,])(-?\d+(?:[.,]\d+)?)\s*(?:vé|ve|ghế|ghe)(?!\w)")
+_MONEY = re.compile(
+    r"(?:dưới|duoi|tối đa|toi da|không quá|khong qua)\s*(-?\d+(?:[.,]\d+)?)\s*(triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k)\b"
 )
+_SEARCH_CAPTURE = re.compile(
+    r"(?:^|\b)(?:tìm(?:\s+kiếm)?|tim(?:\s+kiem)?)(?:\s+cho\s+(?:tôi|mình|toi|minh))?\s+(.+?)(?=\s+(?:ở|o|tại|tai|dưới|duoi|tối đa|toi da|không quá|khong qua)\b|$)"
+)
+
+
+def fold_text(text: str) -> str:
+    text = unicodedata.normalize("NFD", text.casefold().replace("đ", "d"))
+    return "".join(c for c in text if not unicodedata.combining(c))
 
 
 class RuleBasedVietnameseNLU:
@@ -52,6 +69,20 @@ class RuleBasedVietnameseNLU:
         quantity = int(number) if number is not None else None
         city = self._extract_city(norm)
         intent = self._classify_intent(norm)
+        city_followup = (
+            intent is Intent.CLARIFY
+            and city is not None
+            and state.active_intent in (Intent.SEARCH_EVENT, Intent.TICKET_RECOMMEND)
+        )
+        if city_followup:
+            intent = Intent.SEARCH_EVENT
+        explanation_followup = (
+            fold_text(norm).rstrip(".!?") in ("la sao", "nghia la sao", "khong hieu", "sao lai the")
+            and state.budget_amount is not None
+            and state.active_intent in (Intent.SEARCH_EVENT, Intent.TICKET_RECOMMEND)
+        )
+        if explanation_followup:
+            intent = state.active_intent
         removed: set[Slot] = set()
         clear_group = None
         if any(x in norm for x in ("bắt đầu lại", "xóa tất cả tiêu chí", "xóa toàn bộ tiêu chí")):
@@ -74,15 +105,16 @@ class RuleBasedVietnameseNLU:
 
         # Only a scope-only reply resumes the active task; a new task wins.
         scope_resolution = self._scope_from_text(norm)
+        if quantity == 1 and re.fullmatch(r"1\s*(?:ve|ghe)[.!?]*", fold_text(norm)):
+            scope_resolution = Scope.PER_TICKET
         if (
             state.budget_amount is not None
-            and state.budget_scope is Scope.UNKNOWN
             and scope_resolution is not Scope.UNKNOWN
             and _MONEY.search(norm) is None
             and re.fullmatch(
-                r"(?:tính |là |cho |ngân sách )*(?:tổng(?: cộng)?|cả nhóm|mỗi vé|"
-                r"mỗi ghế|từng vé|một vé)(?: (?:nhé|ạ|thôi))?[.!?]*",
-                norm,
+                r"(?:tinh |la |cho |ngan sach )*(?:tong(?: cong)?|ca nhom|moi ve|"
+                r"moi ghe|tung ve|mot ve|1\s*ve|1\s*ghe)(?: (?:nhe|a|thoi))?[.!?]*",
+                fold_text(norm),
             )
         ):
             return Understanding(
@@ -114,7 +146,12 @@ class RuleBasedVietnameseNLU:
             budget_scope = scope_resolution
 
         search_query = self._extract_search_query(norm) if intent is Intent.SEARCH_EVENT else None
-        if intent is Intent.SEARCH_EVENT and search_query is None:
+        if (
+            intent is Intent.SEARCH_EVENT
+            and search_query is None
+            and not city_followup
+            and not explanation_followup
+        ):
             removed.add(Slot.SEARCH_QUERY)
         patch = DialoguePatch(
             city=city,
@@ -141,21 +178,23 @@ class RuleBasedVietnameseNLU:
 
     @staticmethod
     def _extract_city(norm: str) -> str | None:
+        norm = fold_text(norm)
         matches: list[tuple[int, str]] = []
         for marker, canonical in CITY_ALIASES:
-            for match in re.finditer(re.escape(marker), norm):
+            for match in re.finditer(r"(?<!\w)" + re.escape(fold_text(marker)) + r"(?!\w)", norm):
                 prefix = norm[max(0, match.start() - 40) : match.start()]
                 if not re.search(
-                    r"(?:không (?:ở|chọn)|bỏ(?: bộ lọc)?(?: thành phố)?|ngoại trừ)\s*$", prefix
+                    r"(?:khong (?:o|chon)|bo(?: bo loc)?(?: thanh pho)?|ngoai tru)\s*$", prefix
                 ):
                     matches.append((match.start(), canonical))
         return max(matches)[1] if matches else None
 
     @staticmethod
     def _scope_from_text(norm: str) -> Scope:
-        if any(marker in norm for marker in ("mỗi vé", "một vé", "từng vé", "mỗi ghế")):
+        norm = fold_text(norm)
+        if any(marker in norm for marker in ("moi ve", "mot ve", "tung ve", "moi ghe")):
             return Scope.PER_TICKET
-        if any(marker in norm for marker in ("tổng", "tổng cộng", "cả nhóm", "cả 3", "cả 2")):
+        if any(marker in norm for marker in ("tong", "tong cong", "ca nhom", "ca 3", "ca 2")):
             return Scope.TOTAL
         return Scope.UNKNOWN
 
@@ -167,7 +206,7 @@ class RuleBasedVietnameseNLU:
             return None
         if not number.is_finite() or number < 0:
             return None
-        factor = Decimal(1_000_000 if unit in ("triệu", "tr") else 1_000)
+        factor = Decimal(1_000_000 if fold_text(unit) in ("trieu", "tr") else 1_000)
         with localcontext() as context:
             context.prec = max(28, len(raw) + 10)
             amount = number * factor
@@ -181,21 +220,86 @@ class RuleBasedVietnameseNLU:
 
     @staticmethod
     def _classify_intent(norm: str) -> Intent:
-        if any(k in norm for k in ("hoàn tiền", "hoàn vé", "refund")):
+        norm = fold_text(norm)
+        if any(k in norm for k in ("hoan tien", "hoan ve", "refund")):
             return Intent.REFUND_POLICY
-        if "thanh toán" in norm or "giao dịch" in norm:
+        payment = "thanh toan" in norm or "giao dich" in norm
+        private = any(
+            k in norm
+            for k in (
+                "cua toi",
+                "cua minh",
+                "don toi",
+                "don minh",
+                "toi da thanh toan",
+                "trang thai",
+                "thanh cong chua",
+                "da thanh toan chua",
+                "kiem tra don",
+            )
+        ) or bool(re.search(r"\bord[- ]\w+", norm))
+        if payment and private:
             return Intent.PAYMENT_STATUS
-        if "đơn hàng" in norm or "đơn của" in norm:
+        if ("don hang" in norm or "don cua" in norm) and private:
             return Intent.ORDER_STATUS
-        if "vé của tôi" in norm or "vé đã mua" in norm:
+        if any(k in norm for k in ("ve cua toi", "ve cua minh")):
             return Intent.MY_TICKETS
-        if any(k in norm for k in ("đặt vé", "giữ vé", "hủy vé", "mua vé")):
+        if any(k in norm for k in ("giu ve", "huy ve", "chuyen ve", "dat ho", "mua ho")):
             return Intent.BOOKING_GUIDANCE
-        if any(k in norm for k in ("tìm", "sự kiện", "concert", "show")):
+        help_request = any(
+            k in norm
+            for k in (
+                "cach ",
+                "huong dan",
+                "the nao",
+                "lam sao",
+                "vi sao",
+                "tai sao",
+                "o dau",
+                "ho tro",
+                "phuong thuc",
+                "dinh dang",
+                "dung luong",
+                "kich thuoc",
+                "la gi",
+                "dang nhap",
+                "mat khau",
+            )
+        )
+        product_topic = any(
+            k in norm
+            for k in (
+                "ve",
+                "su kien",
+                "thanh toan",
+                "don hang",
+                "anh",
+                "banner",
+                "tai khoan",
+                "dang nhap",
+                "mat khau",
+                "momo",
+                "zalopay",
+                "paypal",
+                "vnpay",
+                "chuyen khoan",
+            )
+        )
+        if (
+            payment
+            or (help_request and product_topic)
+            or any(k in norm for k in ("momo", "zalopay", "paypal", "vnpay"))
+        ):
+            return Intent.PUBLIC_HELP
+        if "ve da mua" in norm:
+            return Intent.MY_TICKETS
+        if any(k in norm for k in ("dat ve", "mua ve")):
+            return Intent.BOOKING_GUIDANCE
+        if any(k in norm for k in ("tim", "su kien", "concert", "show")):
             return Intent.SEARCH_EVENT
-        if "vé" in norm or "ghế" in norm:
+        if "ve" in norm or "ghe" in norm:
             return Intent.TICKET_RECOMMEND
-        if any(k in norm for k in ("chào", "hello", "xin chào")):
+        if any(k in norm for k in ("chao", "hello")):
             return Intent.GREETING
         return Intent.CLARIFY
 
@@ -210,8 +314,18 @@ class RuleBasedVietnameseNLU:
             return None
 
         candidate = match.group(1).strip()
-        candidate = re.sub(r"^(?:[1-9]|1\d|20)\s*(?:vé|ghế)\s+", "", candidate)
-        candidate = re.sub(r"^sự kiện\s+", "", candidate).strip()
+        candidate = re.sub(r"^(?:[1-9]|1\d|20)\s*(?:vé|ve|ghế|ghe)\s+", "", candidate)
+        candidate = re.sub(r"^(?:sự kiện|su kien)\s+", "", candidate).strip()
+        if fold_text(candidate) in (
+            "",
+            "su kien",
+            "ve su kien",
+            "ve",
+            "ghe",
+            "tat ca su kien",
+            "moi su kien",
+        ):
+            return None
         if candidate in (
             "",
             "sự kiện",

@@ -1,0 +1,32 @@
+{
+  "scope": "local-demo-help-only",
+  "status": "approved",
+  "approval_id": "codex-01a18837-20261030-local-help-v1",
+  "owner": "SmartEvent project owner",
+  "reviewer": "SmartEvent project owner",
+  "approved_at": "2026-10-30T00:28:46+07:00",
+  "review_due_at": "2026-11-29T00:28:46+07:00",
+  "user_confirmation": "Duyệt dùng cho demo local",
+  "sources": [
+    {
+      "path": "01_payment_methods.md",
+      "sha256": "7e83275e3e8f2432e291ff1dde9344ce3c17ce33646423bf595ab5519c8971fa"
+    },
+    {
+      "path": "02_booking_guide.md",
+      "sha256": "84f1325315db20c2dde3b25eeceabb54b0bc6dac54602ceba5c45f2b4d929200"
+    },
+    {
+      "path": "03_event_search.md",
+      "sha256": "9331123c63947a2b53ea6e74ff8652c71b3b671d920fa92639cee70bcf884106"
+    },
+    {
+      "path": "04_ticket_account_help.md",
+      "sha256": "48ebdd6e1df396420db374684f86229a6fd697a91c021ca1a5db06e0d5561929"
+    },
+    {
+      "path": "05_organizer_images.md",
+      "sha256": "17021a19094eeb5f461ee6af0ae17ef782c4805bc747667cbf673988fef59cc4"
+    }
+  ]
+}

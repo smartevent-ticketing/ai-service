@@ -1,0 +1,21 @@
+name: smartevent-ai
+services:
+  ai:
+    image: smartevent-ai-service:local-public-search
+    build: .
+    container_name: smartevent-ai
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:8001"
+    environment:
+      BACKEND_BASE_URL: http://host.docker.internal:8080
+      CONFIG_DIR: /app/configs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - type: bind
+        source: ${AI_REVIEWED_CONFIG_DIR:-./artifacts/local-public-search/configs}
+        target: /app/configs
+        read_only: true
+        bind:
+          create_host_path: false

@@ -49,3 +49,49 @@ async def test_clarification_followup_preserves_previous_preferences() -> None:
     assert result.state.quantity == 3
     assert result.state.budget_amount == 800_000
     assert result.state.budget_scope is Scope.TOTAL
+
+
+@pytest.mark.asyncio
+async def test_time_request_is_not_presented_as_an_applied_backend_filter() -> None:
+    result = await ChatUseCase(RuleBasedVietnameseNLU(), RecordingTools()).handle(
+        ChatCommand(message="Có sự kiện gì cuối tháng này ở Hồ Chí Minh?")
+    )
+    assert "chưa lọc được theo khoảng ngày" in result.answer
+
+
+@pytest.mark.asyncio
+async def test_event_links_come_from_projected_backend_rows() -> None:
+    class EventTools:
+        async def execute(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "data": [
+                    {
+                        "id": "08c25afc-f9c9-4db0-aab7-02c779779d6c",
+                        "name": "Đêm nhạc",
+                        "slug": "dem-nhac",
+                    }
+                ]
+            }
+
+    result = await ChatUseCase(RuleBasedVietnameseNLU(), EventTools()).handle(
+        ChatCommand(message="Tìm sự kiện ở Hồ Chí Minh")
+    )
+    assert len(result.event_links) == 1
+    assert result.event_links[0].slug == "dem-nhac"
+    assert result.event_links[0].title == "Đêm nhạc"
+    from smartevent_ai.adapters.inbound.http_api import ChatResponseDTO
+
+    payload = ChatResponseDTO.from_result(result).model_dump(mode="json")
+    assert payload["event_links"][0] == {
+        "event_id": "08c25afc-f9c9-4db0-aab7-02c779779d6c",
+        "title": "Đêm nhạc",
+        "slug": "dem-nhac",
+    }
+
+
+@pytest.mark.asyncio
+async def test_non_search_answer_has_no_event_links() -> None:
+    result = await ChatUseCase(RuleBasedVietnameseNLU(), RecordingTools()).handle(
+        ChatCommand(message="Giữ vé giúp tôi")
+    )
+    assert result.event_links == ()

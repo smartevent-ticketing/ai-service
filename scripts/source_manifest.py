@@ -40,6 +40,7 @@ SOURCE_FILES = {
     "pyproject.toml",
     "uv.lock",
     "Dockerfile",
+    "docker-compose.local.yml",
     "Makefile",
     ".gitignore",
     ".gitattributes",

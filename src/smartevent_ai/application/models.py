@@ -15,6 +15,13 @@ class ChatCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class ChatEventLink:
+    event_id: str
+    title: str
+    slug: str
+
+
+@dataclass(frozen=True, slots=True)
 class ChatResult:
     conversation_id: UUID
     intent: Intent
@@ -23,3 +30,4 @@ class ChatResult:
     grounding: Grounding
     tool_called: str | None = None
     citations: tuple[Citation, ...] = ()
+    event_links: tuple[ChatEventLink, ...] = ()
