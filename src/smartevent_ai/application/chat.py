@@ -22,6 +22,7 @@ from smartevent_ai.domain.dialogue import (
     merge_state,
 )
 from smartevent_ai.domain.errors import (
+    BackendUnavailable,
     ContractViolation,
     ToolUnavailable,
     ModelUnavailable,
@@ -80,10 +81,7 @@ class ChatUseCase:
                 )
         conversation_id = request.conversation_id or uuid4()
 
-        if (
-            understood.needs_clarification
-            and understood.clarification_reason is not ClarificationReason.BUDGET_SCOPE
-        ):
+        if understood.needs_clarification:
             return ChatResult(
                 conversation_id=conversation_id,
                 intent=understood.intent,
@@ -166,7 +164,7 @@ class ChatUseCase:
             # pure_operations (retrieve_policy, optimize_ticket_selection) and
             # ui_actions have no runtime caller; see test_unused_tools_locked.py.
             result = await self._tools.execute("search_events", criteria.as_tool_arguments())
-        except ToolUnavailable:
+        except (ToolUnavailable, BackendUnavailable, ContractViolation):
             return ChatResult(
                 conversation_id=conversation_id,
                 intent=intent,

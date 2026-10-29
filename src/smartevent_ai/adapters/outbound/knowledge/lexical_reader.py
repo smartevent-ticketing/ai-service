@@ -40,7 +40,7 @@ class BM25Retriever:
         }
         scored: list[tuple[float, KnowledgeChunk]] = []
         for chunk, count, length in zip(chunks, counts, lengths, strict=True):
-            if not rarest.issubset(count):
+            if not rarest.intersection(count):
                 continue
             if not query_terms.intersection(terms(chunk.text)):
                 continue  # A matching document title alone is not answer evidence.

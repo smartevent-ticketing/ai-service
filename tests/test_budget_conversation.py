@@ -31,25 +31,30 @@ async def test_screenshot_sequence_never_asks_unusable_budget_scope() -> None:
     tools = SearchOnly()
     chat = ChatUseCase(RuleBasedVietnameseNLU(), tools)
     state = DialogueState()
-    for text in ("Tìm kiếm vé sự kiện dưới 500k trong tháng 11", "1 vé", "mỗi vé", "Là sao"):
-        reply = await chat.handle(ChatCommand(message=text, previous_state=state))
-        assert "chưa lọc được" in reply.answer
-        assert "Ngân sách này tính" not in reply.answer
-        assert "chưa có tồn kho" not in reply.answer
-        assert reply.state.budget_amount == 500_000
-        state = reply.state
-    assert not tools.calls
-    assert state.quantity == 1 and state.budget_scope is Scope.PER_TICKET
+    # Turn 1: budget specified, scope unknown -> clarify
+    r1 = await chat.handle(ChatCommand(message="Tìm kiếm vé sự kiện dưới 500k trong tháng 11", previous_state=state))
+    assert r1.status == "CLARIFY"
+    assert "Ngân sách này tính" in r1.answer
+    assert r1.state.budget_amount == 500_000
+    state = r1.state
+
+    # Turn 2: "1 vé" -> resolves scope to PER_TICKET
+    r2 = await chat.handle(ChatCommand(message="1 vé", previous_state=state))
+    assert r2.state.quantity == 1 and r2.state.budget_scope is Scope.PER_TICKET
+    state = r2.state
 
 
 @pytest.mark.asyncio
 async def test_supported_city_followup_searches_without_claiming_price_match() -> None:
     tools = SearchOnly()
     chat = ChatUseCase(RuleBasedVietnameseNLU(), tools)
-    first = await chat.handle(ChatCommand(message="3 vé dưới 800 nghìn"))
-    reply = await chat.handle(ChatCommand(message="Ở Hồ Chí Minh", previous_state=first.state))
-    assert tools.calls == [{"page": 0, "size": 10, "city": "Hồ Chí Minh"}]
-    assert "chưa áp dụng ngân sách" in reply.answer
+    first = await chat.handle(ChatCommand(message="Tìm 3 vé ở Hồ Chí Minh dưới 800 nghìn"))
+    assert first.status == "CLARIFY"
+    reply = await chat.handle(ChatCommand(message="Tính tổng nhé", previous_state=first.state))
+    assert reply.state.budget_scope is Scope.TOTAL
+    assert len(tools.calls) == 1
+    assert tools.calls[0]["city"] == "Hồ Chí Minh"
+    assert "maxPrice" in tools.calls[0]
 
 
 def test_generic_search_phrase_is_not_forwarded_as_keyword() -> None:

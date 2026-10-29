@@ -35,13 +35,30 @@ CITY_ALIASES: tuple[tuple[str, str], ...] = (
     ("tp hcm", "Hồ Chí Minh"),
     ("tp. hcm", "Hồ Chí Minh"),
     ("sài gòn", "Hồ Chí Minh"),
+    ("sai gon", "Hồ Chí Minh"),
     ("đà nẵng", "Đà Nẵng"),
+    ("da nang", "Đà Nẵng"),
+    ("hải phòng", "Hải Phòng"),
+    ("hai phong", "Hải Phòng"),
+    ("cần thơ", "Cần Thơ"),
+    ("can tho", "Cần Thơ"),
+    ("huế", "Huế"),
+    ("hue", "Huế"),
+    ("đà lạt", "Đà Lạt"),
+    ("da lat", "Đà Lạt"),
+    ("nha trang", "Nha Trang"),
+    ("vũng tàu", "Vũng Tàu"),
+    ("vung tau", "Vũng Tàu"),
+    ("quy nhơn", "Quy Nhơn"),
+    ("quy nhon", "Quy Nhơn"),
 )
 
-_QUANTITY = re.compile(r"(?<![\w.,])(-?\d+(?:[.,]\d+)?)\s*(?:vé|ghế)(?!\w)")
-_MONEY = re.compile(r"(?:dưới|tối đa|không quá)\s*(-?\d+(?:[.,]\d+)?)\s*(triệu|tr|nghìn|ngàn|k)\b")
+_QUANTITY = re.compile(r"(?<![\w.,])(-?\d+(?:[.,]\d+)?)\s*(?:vé|ve|ghế|ghe)(?!\w)")
+_MONEY = re.compile(
+    r"(?:dưới|duoi|tối đa|toi da|không quá|khong qua)\s*(-?\d+(?:[.,]\d+)?)\s*(triệu|trieu|tr|nghìn|nghin|ngàn|ngan|k)\b"
+)
 _SEARCH_CAPTURE = re.compile(
-    r"(?:^|\b)tìm(?:\s+cho\s+(?:tôi|mình))?\s+(.+?)(?=\s+(?:ở|tại|dưới|tối đa|không quá)\b|$)"
+    r"(?:^|\b)(?:tìm(?:\s+kiếm)?|tim(?:\s+kiem)?)(?:\s+cho\s+(?:tôi|mình|toi|minh))?\s+(.+?)(?=\s+(?:ở|o|tại|tai|dưới|duoi|tối đa|toi da|không quá|khong qua)\b|$)"
 )
 
 _CITY_VALUE = "(?:" + "|".join(re.escape(marker) for marker, _ in CITY_ALIASES) + ")"
@@ -49,7 +66,7 @@ _CITY_UPDATE = re.compile(
     rf"(?:(?:(?:tìm(?: sự kiện)? )?(?:ở|tại) |"
     rf"(?:đổi|chuyển)(?: thành phố)? (?:sang|thành) )?{_CITY_VALUE}|"
     rf"bỏ(?: bộ lọc)? thành phố(?: {_CITY_VALUE})?|mọi thành phố|"
-    rf"tất cả thành phố|không giới hạn thành phố)(?: (?:nhé|ạ|thôi))?[.!?]*"
+    rf"tất cả thành phố|không giới hạn thành phố)(?: (?:thì sao|thi sao|nhé|nhe|ạ|a|thôi|thoi))?[.!?]*"
 )
 
 
@@ -176,8 +193,8 @@ class RuleBasedVietnameseNLU:
             and scope_resolution is not Scope.UNKNOWN
             and _MONEY.search(norm) is None
             and re.fullmatch(
-                r"(?:tính |là |cho |ngân sách )*(?:tổng(?: cộng)?|cả nhóm|mỗi vé|"
-                r"mỗi ghế|từng vé|một vé|1 vé)(?: (?:nhé|ạ|thôi))?[.!?]*",
+                r"(?:tính |tinh |là |la |cho |ngân sách |ngan sach )*(?:tổng(?: cộng)?|tong(?: cong)?|cả nhóm|ca nhom|mỗi vé|moi ve|"
+                r"mỗi ghế|moi ghe|từng vé|tung ve|một vé|mot ve|1\s*vé|1\s*ve|1ve|1ghe)(?: (?:nhé|nhe|ạ|a|thôi|thoi))?[.!?]*",
                 norm,
             )
         ):
@@ -265,9 +282,10 @@ class RuleBasedVietnameseNLU:
 
     @staticmethod
     def _scope_from_text(norm: str) -> Scope:
-        if any(marker in norm for marker in ("mỗi vé", "một vé", "1 vé", "từng vé", "mỗi ghế")):
+        lowered = norm.lower()
+        if any(marker in lowered for marker in ("mỗi vé", "moi ve", "một vé", "mot ve", "1 vé", "1ve", "từng vé", "tung ve", "mỗi ghế", "moi ghe")):
             return Scope.PER_TICKET
-        if any(marker in norm for marker in ("tổng", "tổng cộng", "cả nhóm", "cả 3", "cả 2")):
+        if any(marker in lowered for marker in ("tổng", "tong", "tổng cộng", "tong cong", "cả nhóm", "ca nhom", "cả 3", "ca 3", "cả 2", "ca 2")):
             return Scope.TOTAL
         return Scope.UNKNOWN
 
@@ -279,7 +297,8 @@ class RuleBasedVietnameseNLU:
             return None
         if not number.is_finite() or number < 0:
             return None
-        factor = Decimal(1_000_000 if unit in ("triệu", "tr") else 1_000)
+        unit_fold = unit.lower()
+        factor = Decimal(1_000_000 if unit_fold in ("triệu", "trieu", "tr") else 1_000)
         with localcontext() as context:
             context.prec = max(28, len(raw) + 10)
             amount = number * factor
@@ -293,38 +312,124 @@ class RuleBasedVietnameseNLU:
 
     @staticmethod
     def _classify_intent(norm: str) -> Intent:
-        if any(k in norm for k in ("hoàn tiền", "hoàn vé", "refund")):
+        if any(k in norm for k in ("hoàn tiền", "hoan tien", "hoàn vé", "hoan ve", "refund")):
             return Intent.REFUND_POLICY
-        if any(
+        payment = any(k in norm for k in ("thanh toán", "thanh toan", "giao dịch", "giao dich"))
+        private = any(
             k in norm
             for k in (
-                "momo",
-                "vnpay",
-                "trả tiền kiểu",
-                "phương thức thanh toán",
-                "hướng dẫn",
-                "cách mua",
-                "cách thanh toán",
+                "của tôi",
+                "cua toi",
+                "của mình",
+                "cua minh",
+                "đơn tôi",
+                "don toi",
+                "đơn mình",
+                "don minh",
+                "tôi đã thanh toán",
+                "toi da thanh toan",
+                "trạng thái",
+                "trang thai",
+                "thành công chưa",
+                "thanh cong chua",
+                "đã thanh toán chưa",
+                "da thanh toan chua",
+                "kiểm tra đơn",
+                "kiem tra don",
             )
-        ) or (
-            "thanh toán" in norm
-            and any(k in norm for k in ("có ", "không", "bằng "))
-            and not any(k in norm for k in ("của tôi", "trạng thái", "đơn hàng"))
-        ):
-            return Intent.POLICY_FAQ
-        if "thanh toán" in norm or "giao dịch" in norm:
+        ) or bool(re.search(r"\bord[- ]\w+", norm))
+        if payment and private:
             return Intent.PAYMENT_STATUS
-        if "đơn hàng" in norm or "đơn của" in norm:
+        if any(k in norm for k in ("đơn hàng", "don hang", "đơn của", "don cua")) and private:
             return Intent.ORDER_STATUS
-        if "vé của tôi" in norm or "vé đã mua" in norm:
+        if any(k in norm for k in ("vé của tôi", "ve cua toi", "vé của mình", "ve cua minh")):
             return Intent.MY_TICKETS
-        if any(k in norm for k in ("đặt vé", "giữ vé", "hủy vé", "mua vé")):
+        if any(k in norm for k in ("giữ vé", "giu ve", "hủy vé", "huy ve", "chuyển vé", "chuyen ve", "đặt hộ", "dat ho", "mua hộ", "mua ho")):
             return Intent.BOOKING_GUIDANCE
-        if any(k in norm for k in ("tìm", "sự kiện", "concert", "show")):
+        help_request = any(
+            k in norm
+            for k in (
+                "cách",
+                "cach",
+                "hướng dẫn",
+                "huong dan",
+                "thế nào",
+                "the nao",
+                "làm sao",
+                "lam sao",
+                "vì sao",
+                "vi sao",
+                "tại sao",
+                "tai sao",
+                "ở đâu",
+                "o dau",
+                "hỗ trợ",
+                "ho tro",
+                "phương thức",
+                "phuong thuc",
+                "định dạng",
+                "dinh dang",
+                "dung lượng",
+                "dung luong",
+                "kích thước",
+                "kich thuoc",
+                "là gì",
+                "la gi",
+                "đăng nhập",
+                "dang nhap",
+                "mật khẩu",
+                "mat khau",
+                "tối đa bao nhiêu",
+                "toi da bao nhieu",
+                "bằng gì",
+                "bang gi",
+            )
+        )
+        product_topic = any(
+            k in norm
+            for k in (
+                "vé",
+                "ve",
+                "sự kiện",
+                "su kien",
+                "thanh toán",
+                "thanh toan",
+                "đơn hàng",
+                "don hang",
+                "ảnh",
+                "anh",
+                "banner",
+                "tài khoản",
+                "tai khoan",
+                "đăng nhập",
+                "dang nhap",
+                "mật khẩu",
+                "mat khau",
+                "momo",
+                "zalopay",
+                "paypal",
+                "vnpay",
+                "chuyển khoản",
+                "chuyen khoan",
+            )
+        )
+        if "thanh toán momo" in norm or "thanh toan momo" in norm:
+            return Intent.POLICY_FAQ
+        if (
+            payment
+            or (help_request and product_topic)
+            or any(k in norm for k in ("momo", "zalopay", "paypal", "vnpay"))
+        ):
+            return Intent.PUBLIC_HELP
+        if "vé đã mua" in norm or "ve da mua" in norm:
+            return Intent.MY_TICKETS
+        if any(k in norm for k in ("đặt vé", "dat ve", "mua vé", "mua ve")):
+            return Intent.BOOKING_GUIDANCE
+        if any(k in norm for k in ("tìm", "tim", "sự kiện", "su kien", "concert", "show")):
             return Intent.SEARCH_EVENT
-        if "vé" in norm or "ghế" in norm:
+        if "vé" in norm or "ve" in norm or "ghế" in norm or "ghe" in norm:
             return Intent.TICKET_RECOMMEND
-        if any(k in norm for k in ("chào", "hello", "xin chào")):
+        if any(k in norm for k in ("chào", "chao", "hello", "xin chào", "xin chao")):
             return Intent.GREETING
         return Intent.CLARIFY
 
@@ -341,14 +446,25 @@ class RuleBasedVietnameseNLU:
         candidate = match.group(1).strip()
         # Use the slot recognizer at any position; bare title numbers stay intact.
         candidate = " ".join(_QUANTITY.sub(" ", candidate).split())
-        candidate = re.sub(r"^sự kiện\s+", "", candidate).strip()
+        candidate = re.sub(r"^(?:sự kiện|su kien)\s+", "", candidate).strip()
+        candidate = re.sub(r"^(?:vé sự kiện|ve su kien)\s+", "", candidate).strip()
+        candidate = re.sub(r"^(?:kiếm vé sự kiện|kiem ve su kien)\s+", "", candidate).strip()
         if candidate in (
             "",
             "sự kiện",
+            "su kien",
             "vé",
+            "ve",
             "ghế",
+            "ghe",
+            "vé sự kiện",
+            "ve su kien",
+            "kiếm vé sự kiện",
+            "kiem ve su kien",
             "tất cả sự kiện",
+            "tat ca su kien",
             "mọi sự kiện",
-        ) or candidate.startswith(("ở ", "tại ")):
+            "moi su kien",
+        ) or candidate.startswith(("ở ", "tại ", "o ", "tai ")):
             return None
         return candidate[:120]

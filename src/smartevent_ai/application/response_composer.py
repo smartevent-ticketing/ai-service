@@ -24,8 +24,6 @@ class ResponseComposer:
     def search_result(self, result: dict[str, object]) -> str:
         data = result.get("data")
         count = len(data) if isinstance(data, list) else 0
-        if count == 0:
-            return "Không có sự kiện khớp các điều kiện này. Bạn có thể đổi thành phố, thời gian hoặc ngân sách."
         if (
             result.get("has_more")
             or result.get("pagination_limited")
