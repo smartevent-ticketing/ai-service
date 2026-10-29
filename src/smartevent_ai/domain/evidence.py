@@ -29,7 +29,8 @@ _STOP = frozenset(
 
 
 def _normalize(text: str) -> str:
-    cleaned = re.sub(r"\bvề\b", " ", text, flags=re.IGNORECASE)
+    nfc_text = unicodedata.normalize("NFC", text)
+    cleaned = re.sub(r"\bvề\b", " ", nfc_text, flags=re.IGNORECASE)
     normalized = unicodedata.normalize("NFD", cleaned.lower().replace("đ", "d"))
     return " ".join("".join(c for c in normalized if not unicodedata.combining(c)).split())
 

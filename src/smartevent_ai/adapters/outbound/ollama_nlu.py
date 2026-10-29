@@ -21,6 +21,7 @@ from smartevent_ai.domain.dialogue import (
     DialogueState,
     Intent,
     Scope,
+    Slot,
     Understanding,
 )
 
@@ -188,6 +189,8 @@ class OllamaNLU:
 
             budget_scope = Scope.UNKNOWN
             raw_scope = entities.get("budget_scope")
+            if raw_scope is not None:
+                raw_scope = str(raw_scope).strip().upper()
             if raw_scope in (Scope.TOTAL, Scope.PER_TICKET):
                 budget_scope = Scope(raw_scope)
 
@@ -196,14 +199,15 @@ class OllamaNLU:
             if proposed_action == "EXPLAIN_WRITE_LIMITATION" or "giữ vé" in text.lower():
                 intent = Intent.BOOKING_GUIDANCE
 
-            effective_budget = (
-                budget_amount if budget_amount is not None else state.budget_amount
-            )
-            resolved_scope = (
-                budget_scope
-                if effective_budget is not None and budget_scope is not Scope.UNKNOWN
-                else None
-            )
+            removed_slots: set[Slot] = set()
+            if budget_amount is not None:
+                resolved_scope = budget_scope
+                if budget_scope is Scope.UNKNOWN and state.budget_scope is not Scope.UNKNOWN:
+                    removed_slots.add(Slot.BUDGET_SCOPE)
+            elif state.budget_amount is not None and budget_scope is not Scope.UNKNOWN:
+                resolved_scope = budget_scope
+            else:
+                resolved_scope = None
 
             patch = DialoguePatch(
                 city=city,
@@ -213,6 +217,7 @@ class OllamaNLU:
                 event_name=entities.get("event_name"),
                 search_query=search_query,
                 active_intent=intent,
+                removed_slots=frozenset(removed_slots),
             )
             return Understanding(intent=intent, patch=patch)
 

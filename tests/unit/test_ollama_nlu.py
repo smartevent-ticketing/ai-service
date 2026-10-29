@@ -232,3 +232,64 @@ def test_ollama_nlu_includes_previous_state_in_prompt_and_resolves_budget_scope(
     assert "budget_amount: 500000" in user_msg
     assert result.patch.budget_scope == Scope.PER_TICKET
 
+
+def test_ollama_nlu_budget_scope_case_insensitive() -> None:
+    ollama_payload = {
+        "message": {
+            "role": "assistant",
+            "content": json.dumps(
+                {
+                    "primary_intent": "TICKET_RECOMMEND",
+                    "entities": {
+                        "budget_amount": 600000,
+                        "budget_scope": "  per_ticket  ",
+                    },
+                }
+            ),
+        }
+    }
+    client = make_mock_client(ollama_payload)
+    nlu = OllamaNLU(client=client)
+
+    result = nlu.parse("600k mỗi vé", DialogueState())
+
+    assert result.patch.budget_amount == 600000
+    assert result.patch.budget_scope == Scope.PER_TICKET
+
+
+def test_ollama_nlu_resets_scope_to_unknown_on_new_budget_with_unknown_scope() -> None:
+    from smartevent_ai.domain.dialogue import Slot, merge_state
+
+    ollama_payload = {
+        "message": {
+            "role": "assistant",
+            "content": json.dumps(
+                {
+                    "primary_intent": "TICKET_RECOMMEND",
+                    "entities": {
+                        "budget_amount": 900000,
+                        "budget_scope": "UNKNOWN",
+                    },
+                }
+            ),
+        }
+    }
+    client = make_mock_client(ollama_payload)
+    nlu = OllamaNLU(client=client)
+
+    prev_state = DialogueState(
+        active_intent=Intent.TICKET_RECOMMEND,
+        budget_amount=500_000,
+        budget_scope=Scope.TOTAL,
+    )
+    result = nlu.parse("Tôi đổi ngân sách sang 900k", prev_state)
+
+    assert result.patch.budget_amount == 900000
+    assert result.patch.budget_scope == Scope.UNKNOWN
+    assert Slot.BUDGET_SCOPE in result.patch.removed_slots
+
+    merged = merge_state(prev_state, result.patch)
+    assert merged.budget_amount == 900000
+    assert merged.budget_scope == Scope.UNKNOWN
+
+

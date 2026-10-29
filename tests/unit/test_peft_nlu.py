@@ -180,3 +180,104 @@ def test_peft_nlu_resolves_budget_scope_with_previous_state() -> None:
     assert "budget_amount: 300000" in fake_gen.last_prompt
     assert "event_name: EDM Night" in fake_gen.last_prompt
     assert result.patch.budget_scope == Scope.PER_TICKET
+
+
+def test_peft_nlu_budget_scope_case_insensitive() -> None:
+    fake_json = json.dumps(
+        {
+            "primary_intent": "TICKET_RECOMMEND",
+            "entities": {"budget_amount": 400000, "budget_scope": " total "},
+        }
+    )
+    nlu = PeftTransformerNLU(generator=FakeGenerator(fake_json))
+    result = nlu.parse("400k tổng", DialogueState())
+
+    assert result.patch.budget_amount == 400000
+    assert result.patch.budget_scope == Scope.TOTAL
+
+
+def test_peft_nlu_resets_scope_to_unknown_on_new_budget_with_unknown_scope() -> None:
+    from smartevent_ai.domain.dialogue import Slot, merge_state
+
+    fake_json = json.dumps(
+        {
+            "primary_intent": "TICKET_RECOMMEND",
+            "entities": {"budget_amount": 800000, "budget_scope": "UNKNOWN"},
+        }
+    )
+    nlu = PeftTransformerNLU(generator=FakeGenerator(fake_json))
+    prev_state = DialogueState(
+        active_intent=Intent.TICKET_RECOMMEND,
+        budget_amount=300_000,
+        budget_scope=Scope.PER_TICKET,
+    )
+    result = nlu.parse("Đổi ngân sách sang 800k", prev_state)
+
+    assert result.patch.budget_amount == 800000
+    assert result.patch.budget_scope == Scope.UNKNOWN
+    assert Slot.BUDGET_SCOPE in result.patch.removed_slots
+
+    merged = merge_state(prev_state, result.patch)
+    assert merged.budget_amount == 800000
+    assert merged.budget_scope == Scope.UNKNOWN
+
+
+def test_peft_nlu_threading_lock_initialized() -> None:
+    import threading
+
+    nlu = PeftTransformerNLU()
+    assert isinstance(nlu._lock, type(threading.Lock()))
+
+
+def test_peft_nlu_tokenizer_fallback_when_adapter_lacks_config(tmp_path, monkeypatch) -> None:
+    adapter_dir = tmp_path / "dummy_adapter"
+    adapter_dir.mkdir()
+
+    loaded_sources: list[str] = []
+
+    class MockAutoTokenizer:
+        @classmethod
+        def from_pretrained(cls, source: str, **kwargs) -> object:
+            loaded_sources.append(source)
+            class MockTok:
+                pad_token = None
+                eos_token = "<eos>"
+            return MockTok()
+
+    class MockAutoModel:
+        @classmethod
+        def from_pretrained(cls, *args, **kwargs) -> object:
+            return object()
+
+    class MockPeftModel:
+        @classmethod
+        def from_pretrained(cls, *args, **kwargs) -> object:
+            class MockM:
+                def eval(self) -> None:
+                    pass
+            return MockM()
+
+    import sys
+    from unittest.mock import MagicMock
+    mock_transformers = MagicMock()
+    mock_transformers.AutoTokenizer = MockAutoTokenizer
+    mock_transformers.AutoModelForCausalLM = MockAutoModel
+    mock_transformers.BitsAndBytesConfig = MagicMock()
+    mock_peft = MagicMock()
+    mock_peft.PeftModel = MockPeftModel
+
+    monkeypatch.setitem(sys.modules, "transformers", mock_transformers)
+    monkeypatch.setitem(sys.modules, "peft", mock_peft)
+    mock_torch = MagicMock()
+    mock_torch.cuda.is_available.return_value = False
+    monkeypatch.setitem(sys.modules, "torch", mock_torch)
+
+    nlu = PeftTransformerNLU(
+        adapter_path=adapter_dir,
+        base_model_name="test/base-model",
+    )
+    nlu._ensure_loaded()
+
+    assert loaded_sources == ["test/base-model"]
+    assert nlu._tokenizer is not None
+

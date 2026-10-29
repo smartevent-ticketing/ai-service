@@ -7,6 +7,7 @@ Enforces the READ_ONLY invariant and falls back to raw extractive passages on an
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import Any, Callable
 
@@ -37,6 +38,9 @@ class OllamaPolicySynthesizer:
         self._model = model
         self._timeout = timeout
         self._client = client or httpx.Client(timeout=timeout)
+
+    def close(self) -> None:
+        self._client.close()
 
     def synthesize(self, query: str, context: str) -> str:
         try:
@@ -86,12 +90,16 @@ class PeftPolicySynthesizer:
         self._generator = generator
         self._model: Any = None
         self._tokenizer: Any = None
+        self._lock = threading.Lock()
 
     def _ensure_loaded(self) -> None:
         if self._generator is not None or self._model is not None:
             return
-        if self._adapter_path is None or not self._adapter_path.exists():
-            raise FileNotFoundError(f"RAG adapter path not found: {self._adapter_path}")
+        with self._lock:
+            if self._generator is not None or self._model is not None:
+                return
+            if self._adapter_path is None or not self._adapter_path.exists():
+                raise FileNotFoundError(f"RAG adapter path not found: {self._adapter_path}")
 
         import torch as _torch  # type: ignore[import-untyped]
         torch_any: Any = _torch

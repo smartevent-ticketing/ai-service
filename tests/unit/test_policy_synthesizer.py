@@ -67,7 +67,7 @@ def test_ollama_synthesizer_falls_back_on_timeout() -> None:
 
 
 def test_retrieve_policy_delegates_to_synthesizer_when_provided(tmp_path) -> None:
-    from knowledge_helpers import NOW, make_bundle
+    from knowledge_helpers import NOW, make_bundle  # type: ignore[import-not-found]
     from smartevent_ai.adapters.outbound.knowledge.artifact_reader import ArtifactKnowledgeStore
     from smartevent_ai.adapters.outbound.knowledge.lexical_reader import BM25Retriever
     from smartevent_ai.tooling.offline_jobs.evaluate import FrozenClock
@@ -135,3 +135,22 @@ def test_peft_synthesizer_with_generator_success_and_fallback(tmp_path) -> None:
     missing_synth = PeftPolicySynthesizer(adapter_path=tmp_path / "nonexistent")
     with pytest.raises(FileNotFoundError):
         missing_synth._ensure_loaded()
+
+
+def test_ollama_policy_synthesizer_close() -> None:
+    client = make_mock_client("ok")
+    synth = OllamaPolicySynthesizer(client=client)
+    assert not client.is_closed
+    synth.close()
+    assert client.is_closed
+
+
+def test_peft_policy_synthesizer_threading_lock() -> None:
+    import threading
+    from smartevent_ai.adapters.outbound.knowledge.policy_synthesizer import (
+        PeftPolicySynthesizer,
+    )
+
+    synth = PeftPolicySynthesizer()
+    assert isinstance(synth._lock, type(threading.Lock()))
+

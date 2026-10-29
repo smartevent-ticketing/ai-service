@@ -73,6 +73,19 @@ def test_query_with_ve_retains_evidence() -> None:
     assert classify("Chính sách về vé", chunk) is EvidenceVerdict.KEPT
 
 
+def test_decomposed_ve_normalization_avoids_confusion_with_ticket() -> None:
+    import unicodedata
+
+    # NFD decomposed form of "Hỏi về hoàn tiền": "về" is decomposed
+    query_decomposed = unicodedata.normalize("NFD", "Hỏi về hoàn tiền")
+    chunk = _chunk("Điều kiện hoàn tiền: xử lý trong 7 ngày.")
+    assert classify(query_decomposed, chunk) is EvidenceVerdict.KEPT
+
+    query_ve_ticket = unicodedata.normalize("NFD", "Chính sách về vé")
+    chunk_ticket = _chunk("Chính sách vé: hoàn tiền vé trong vòng 7 ngày.")
+    assert classify(query_ve_ticket, chunk_ticket) is EvidenceVerdict.KEPT
+
+
 @pytest.mark.parametrize(
     "query",
     [

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from pathlib import Path
 from typing import Any, Callable
 
@@ -20,6 +21,7 @@ from smartevent_ai.domain.dialogue import (
     DialogueState,
     Intent,
     Scope,
+    Slot,
     Understanding,
 )
 
@@ -52,42 +54,74 @@ class PeftTransformerNLU:
         self._fallback_nlu = RuleBasedVietnameseNLU()
         self._model: Any = None
         self._tokenizer: Any = None
+        self._lock = threading.Lock()
 
     def _ensure_loaded(self) -> None:
         if self._generator is not None or self._model is not None:
             return
-        if self._adapter_path is None or not self._adapter_path.exists():
-            raise FileNotFoundError(f"Adapter path not found: {self._adapter_path}")
+        with self._lock:
+            if self._generator is not None or self._model is not None:
+                return
+            if self._adapter_path is None or not self._adapter_path.exists():
+                raise FileNotFoundError(f"Adapter path not found: {self._adapter_path}")
 
-        import torch as _torch  # type: ignore[import-untyped]
-        torch_any: Any = _torch
-        from peft import PeftModel  # type: ignore[import-not-found]
-        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+            import torch as _torch  # type: ignore[import-untyped]
+            torch_any: Any = _torch
+            from peft import PeftModel  # type: ignore[import-not-found]
+            from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            str(self._adapter_path), trust_remote_code=True
-        )
-        if self._tokenizer.pad_token is None:
-            self._tokenizer.pad_token = self._tokenizer.eos_token
-
-        quant_config = None
-        if torch_any.cuda.is_available() and self._load_4bit:
-            quant_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch_any.float16,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_use_double_quant=True,
+            tokenizer_source = str(self._adapter_path)
+            has_tokenizer_config = (
+                (self._adapter_path / "tokenizer_config.json").exists()
+                or (self._adapter_path / "tokenizer.json").exists()
             )
+            if not has_tokenizer_config:
+                logger.info(
+                    "Tokenizer config not found in %s; falling back to base model %s",
+                    self._adapter_path,
+                    self._base_model_name,
+                )
+                tokenizer_source = self._base_model_name
 
-        base = AutoModelForCausalLM.from_pretrained(
-            self._base_model_name,
-            quantization_config=quant_config,
-            device_map="auto" if torch_any.cuda.is_available() else "cpu",
-            torch_dtype=torch_any.float16 if torch_any.cuda.is_available() else torch_any.float32,
-            trust_remote_code=True,
-        )
-        self._model = PeftModel.from_pretrained(base, str(self._adapter_path))
-        self._model.eval()
+            try:
+                self._tokenizer = AutoTokenizer.from_pretrained(
+                    tokenizer_source, trust_remote_code=True
+                )
+            except Exception as e:
+                if tokenizer_source != self._base_model_name:
+                    logger.warning(
+                        "Failed loading tokenizer from %s (%s); falling back to base model %s",
+                        tokenizer_source,
+                        e,
+                        self._base_model_name,
+                    )
+                    self._tokenizer = AutoTokenizer.from_pretrained(
+                        self._base_model_name, trust_remote_code=True
+                    )
+                else:
+                    raise
+
+            if self._tokenizer.pad_token is None:
+                self._tokenizer.pad_token = self._tokenizer.eos_token
+
+            quant_config = None
+            if torch_any.cuda.is_available() and self._load_4bit:
+                quant_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch_any.float16,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_use_double_quant=True,
+                )
+
+            base = AutoModelForCausalLM.from_pretrained(
+                self._base_model_name,
+                quantization_config=quant_config,
+                device_map="auto" if torch_any.cuda.is_available() else "cpu",
+                torch_dtype=torch_any.float16 if torch_any.cuda.is_available() else torch_any.float32,
+                trust_remote_code=True,
+            )
+            self._model = PeftModel.from_pretrained(base, str(self._adapter_path))
+            self._model.eval()
 
     def _generate(self, user_text: str, state: DialogueState | None = None) -> str:
         user_content = user_text
@@ -137,13 +171,14 @@ class PeftTransformerNLU:
         )
         inputs = self._tokenizer(prompt, return_tensors="pt").to(self._model.device)
 
-        with torch_any.no_grad():
-            output_tokens = self._model.generate(
-                **inputs,
-                max_new_tokens=256,
-                do_sample=False,
-                pad_token_id=self._tokenizer.pad_token_id,
-            )
+        with self._lock:
+            with torch_any.no_grad():
+                output_tokens = self._model.generate(
+                    **inputs,
+                    max_new_tokens=256,
+                    do_sample=False,
+                    pad_token_id=self._tokenizer.pad_token_id,
+                )
         prompt_len = inputs["input_ids"].shape[1]
         gen_tokens = output_tokens[0][prompt_len:]
         return self._tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
@@ -234,6 +269,8 @@ class PeftTransformerNLU:
 
             budget_scope = Scope.UNKNOWN
             raw_scope = entities.get("budget_scope")
+            if raw_scope is not None:
+                raw_scope = str(raw_scope).strip().upper()
             if raw_scope in (Scope.TOTAL, Scope.PER_TICKET):
                 budget_scope = Scope(raw_scope)
 
@@ -242,14 +279,15 @@ class PeftTransformerNLU:
             if proposed_action == "EXPLAIN_WRITE_LIMITATION" or "giữ vé" in text.lower():
                 intent = Intent.BOOKING_GUIDANCE
 
-            effective_budget = (
-                budget_amount if budget_amount is not None else state.budget_amount
-            )
-            resolved_scope = (
-                budget_scope
-                if effective_budget is not None and budget_scope is not Scope.UNKNOWN
-                else None
-            )
+            removed_slots: set[Slot] = set()
+            if budget_amount is not None:
+                resolved_scope = budget_scope
+                if budget_scope is Scope.UNKNOWN and state.budget_scope is not Scope.UNKNOWN:
+                    removed_slots.add(Slot.BUDGET_SCOPE)
+            elif state.budget_amount is not None and budget_scope is not Scope.UNKNOWN:
+                resolved_scope = budget_scope
+            else:
+                resolved_scope = None
 
             patch = DialoguePatch(
                 city=city,
@@ -259,6 +297,7 @@ class PeftTransformerNLU:
                 event_name=entities.get("event_name"),
                 search_query=search_query,
                 active_intent=intent,
+                removed_slots=frozenset(removed_slots),
             )
             return Understanding(intent=intent, patch=patch)
 
