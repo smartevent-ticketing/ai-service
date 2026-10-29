@@ -217,7 +217,7 @@
   "tests/contract/test_knowledge_ingestion.py": "ea7453823af0b7c06f553151d02865f070375fcc3db5e49103cf8987ee58b396",
   "tests/contract/test_knowledge_semantic.py": "cd9ef3fc01e54854bd5cbaded905cd88b92b3f74fb9cd2e2e3ba5ee3e365f20b",
   "tests/contract/test_ollama_chat_integration.py": "a55d28dc40e41b918c55d919e5920f36d066a2df0b18e4356996565f22e46d01",
-  "tests/contract/test_peft_chat_integration.py": "c8e840d3979a0eaafce3816f3012e2a440bbf46d58e20e5cabe0e7f0be11ec99",
+  "tests/contract/test_peft_chat_integration.py": "1875a16cd7395b0b1192c385dd4879f311d8260b121435956871b9dea5dc786f",
   "tests/contract/test_policy_chat.py": "ef1a53144ab8169d293f82bd89078c656fbbce0b9229037aba9de21037bbf03c",
   "tests/contract/test_policy_retrieval.py": "c21af5ff5882edf9df81976ca5b12a30284f54c503c4788f62b0a5c7eacef87a",
   "tests/contract/test_rag_generative_chat.py": "1b2da483439599a3411a9fb7354c983667af98fcd7372d15ce9fd71ffb510cdb",

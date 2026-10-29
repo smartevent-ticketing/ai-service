@@ -46,12 +46,13 @@ def test_chat_endpoint_peft_fallback_on_corrupted_model_output(monkeypatch) -> N
     app.state.chat._nlu = PeftTransformerNLU(generator=corrupt_generator)
 
     with TestClient(app) as client:
-        # RuleBased fallback parses 'ở Đà Nẵng' cleanly
+        # Invalid structured output asks for clarification and cannot invoke a tool
         response = client.post("/api/v1/chat", json={"message": "Tìm sự kiện ở Đà Nẵng"})
         assert response.status_code == 200
         data = response.json()
-        assert data["intent"] == "SEARCH_EVENT"
-        assert data["state"]["city"] == "Đà Nẵng"
+        assert data["intent"] == "CLARIFY"
+        assert data["tool_called"] is None
+        assert data["mode"] == "fallback"
 
 
 def test_chat_endpoint_peft_preserves_read_only_boundary() -> None:
