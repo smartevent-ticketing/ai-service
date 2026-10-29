@@ -102,7 +102,8 @@ def test_retrieve_policy_delegates_to_synthesizer_when_provided(tmp_path) -> Non
         synthesizer=EchoSynthesizer(),
     )
     answer_gen = reader_generative.answer("chính sách hoàn tiền")
-    assert answer_gen.answer == "NATURAL ANSWER FOR: chính sách hoàn tiền"
+    assert answer_gen.answer == answer_ext.answer
+    assert answer_gen.mode == "extractive_fallback"
     # Citations must be preserved!
     assert answer_gen.citations == answer_ext.citations
 

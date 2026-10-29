@@ -5,6 +5,12 @@ from smartevent_ai.domain.dialogue import ClarificationReason, Intent
 
 class ResponseComposer:
     def clarification(self, reason: ClarificationReason | None) -> str:
+        if reason is ClarificationReason.DATE_INVALID:
+            return "Vui lòng cho biết tháng hoặc khoảng thời gian hợp lệ để tìm sự kiện."
+        if reason is ClarificationReason.MODEL_OUTPUT_INVALID:
+            return "Tôi chưa hiểu chắc điều kiện này. Bạn vui lòng diễn đạt lại yêu cầu."
+        if reason is ClarificationReason.QUANTITY_REQUIRED:
+            return "Tổng ngân sách này dành cho bao nhiêu vé?"
         if reason is ClarificationReason.BUDGET_SCOPE:
             return "Ngân sách này tính cho mỗi vé hay tổng tất cả vé?"
         if reason is ClarificationReason.BUDGET_OUT_OF_RANGE:
@@ -16,6 +22,8 @@ class ResponseComposer:
     def search_result(self, result: dict[str, object]) -> str:
         data = result.get("data")
         count = len(data) if isinstance(data, list) else 0
+        if count == 0:
+            return "Không có sự kiện khớp các điều kiện này. Bạn có thể đổi thành phố, thời gian hoặc ngân sách."
         if (
             result.get("has_more")
             or result.get("pagination_limited")

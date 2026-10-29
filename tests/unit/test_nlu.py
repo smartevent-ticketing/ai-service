@@ -158,6 +158,15 @@ def test_search_arguments_separate_ticket_quantity_from_title(message, quantity,
         expected["q"] = query
     if city is not None:
         expected["city"] = city
+    if state.budget_amount is not None:
+        from decimal import Decimal
+
+        expected["maxPrice"] = format(
+            Decimal(state.budget_amount)
+            / (state.quantity if state.budget_scope is Scope.TOTAL else 1),
+            "f",
+        )
+        expected["priceComparison"] = state.price_comparison or "LTE"
     assert EventSearchCriteria.from_state(state).as_tool_arguments() == expected
 
 
@@ -186,4 +195,6 @@ def test_budget_scope_followup_preserves_search_without_quantity_in_query():
         "city": "Hà Nội",
         "page": 0,
         "size": 10,
+        "maxPrice": "266666.6666666666666666666667",
+        "priceComparison": "LT",
     }

@@ -39,6 +39,12 @@ tools:
     - startTime
     - endTime
     - status
+    - price
+    - currency
+    - ticketTypeId
+    - salePhaseId
+    - priceObservedAt
+    - priceBasis
     deny_unlisted_fields: true
     redact_fields:
     - qrCodeBase64
@@ -86,6 +92,20 @@ tools:
         type: integer
         minimum: 1
         maximum: 20
+      startFrom:
+        type: string
+        format: date-time
+      startBefore:
+        type: string
+        format: date-time
+      maxPrice:
+        type: string
+        pattern: ^\d{1,10}(\.\d{1,28})?$
+      priceComparison:
+        type: string
+        enum:
+        - LT
+        - LTE
     required: []
     additionalProperties: false
   principal_scope: PUBLIC_ANONYMOUS
@@ -119,6 +139,26 @@ tools:
         type: string
         enum:
         - PUBLISHED
+      price:
+        type: number
+        minimum: 0
+      currency:
+        type: string
+        enum:
+        - VND
+      ticketTypeId:
+        type: string
+        format: uuid
+      salePhaseId:
+        type: string
+        format: uuid
+      priceObservedAt:
+        type: string
+        format: date-time
+      priceBasis:
+        type: string
+        enum:
+        - TICKET_FACE_VALUE
     additionalProperties: false
     required:
     - id

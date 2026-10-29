@@ -102,8 +102,8 @@ def test_malformed_json_from_ollama_falls_back_to_rule_nlu() -> None:
     # Should gracefully fall back to rule-based parse without exception
     result = nlu.parse("Tìm concert ở Đà Nẵng", DialogueState())
 
-    assert result.intent == Intent.SEARCH_EVENT
-    assert result.patch.city == "Đà Nẵng"
+    assert result.intent == Intent.CLARIFY
+    assert result.needs_clarification
 
 
 def test_network_or_connection_error_falls_back_to_rule_nlu() -> None:

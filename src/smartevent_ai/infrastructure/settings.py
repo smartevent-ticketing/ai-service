@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
+from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PACKAGE_CONFIG_DIR = Path(__file__).resolve().parents[1] / "resources"
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
     backend_base_url: str = "http://127.0.0.1:8080"
     config_dir: Path | None = Field(default=None)
 
-    nlu_backend: str = "rule"
+    nlu_backend: Literal["rule", "ollama", "peft"] = "rule"
     nlu_adapter_path: Path | None = Field(default=None)
     nlu_base_model: str = "Qwen/Qwen2.5-1.5B-Instruct"
     nlu_load_4bit: bool = True
@@ -34,7 +35,10 @@ class Settings(BaseSettings):
     ollama_rag_model: str = "smartevent-rag:3b"
     ollama_timeout_seconds: float = 10.0
 
-    rag_backend: str = "extractive"
+    policy_backend: Literal["artifact", "http"] = "artifact"
+    knowledge_base_url: str = "http://127.0.0.1:8010"
+    knowledge_service_token: SecretStr = SecretStr("")
+    rag_backend: Literal["extractive", "ollama", "peft"] = "extractive"
     rag_adapter_path: Path | None = Field(default=None)
     rag_base_model: str = "Qwen/Qwen2.5-3B-Instruct"
     rag_load_4bit: bool = True

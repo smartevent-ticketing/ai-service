@@ -7,6 +7,9 @@ crash the HTTP boundary. It emits typed domain values only.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
+from datetime import datetime, timezone, timedelta
+from typing import Callable
 from decimal import Decimal, InvalidOperation, localcontext
 
 from smartevent_ai.domain.dialogue import (
@@ -25,6 +28,10 @@ from smartevent_ai.domain.dialogue import (
 CITY_ALIASES: tuple[tuple[str, str], ...] = (
     ("hà nội", "Hà Nội"),
     ("hồ chí minh", "Hồ Chí Minh"),
+    ("tp.hcm", "Hồ Chí Minh"),
+    ("hcm", "Hồ Chí Minh"),
+    ("ha noi", "Hà Nội"),
+    ("ho chi minh", "Hồ Chí Minh"),
     ("tp hcm", "Hồ Chí Minh"),
     ("tp. hcm", "Hồ Chí Minh"),
     ("sài gòn", "Hồ Chí Minh"),
@@ -47,7 +54,68 @@ _CITY_UPDATE = re.compile(
 
 
 class RuleBasedVietnameseNLU:
+    def __init__(self, now: Callable[[], datetime] | None = None) -> None:
+        self._now = now or (lambda: datetime.now(timezone.utc))
+
     def parse(self, text: str, state: DialogueState) -> Understanding:
+        norm = " ".join(text.casefold().strip().split())
+        try:
+            result = self._parse(text, state)
+            patch = result.patch
+            start, end = self._dates(norm)
+            if start is not None:
+                patch = replace(patch, start_from=start, start_before=end)
+            if any(x in norm for x in ("bỏ giới hạn ngày", "bỏ ngày", "mọi thời gian")):
+                patch = replace(
+                    patch, removed_slots=patch.removed_slots | {Slot.START_FROM, Slot.START_BEFORE}
+                )
+            if result.intent is Intent.POLICY_FAQ:
+                patch = replace(
+                    patch,
+                    faq_topic="thanh toán"
+                    if any(x in norm for x in ("thanh toán", "momo", "vnpay", "ví"))
+                    else "hướng dẫn",
+                )
+            merged = merge_state(state, patch)
+            reason = result.clarification_reason
+            if result.intent is Intent.SEARCH_EVENT and merged.budget_amount is not None:
+                if merged.budget_scope is Scope.UNKNOWN:
+                    reason = ClarificationReason.BUDGET_SCOPE
+                elif merged.budget_scope is Scope.TOTAL and merged.quantity is None:
+                    reason = ClarificationReason.QUANTITY_REQUIRED
+            return replace(
+                result,
+                patch=patch,
+                needs_clarification=reason is not None,
+                clarification_reason=reason,
+            )
+        except (ValueError, OverflowError):
+            return Understanding(
+                Intent.CLARIFY,
+                needs_clarification=True,
+                clarification_reason=ClarificationReason.DATE_INVALID,
+            )
+
+    def _dates(self, text: str) -> tuple[datetime | None, datetime | None]:
+        local = self._now().astimezone(timezone(timedelta(hours=7)))
+        match = re.search(r"tháng\s+(\d{1,2})(?:[ /-](\d{4}))?", text)
+        if match:
+            month = int(match.group(1))
+            year = (
+                int(match.group(2))
+                if match.group(2)
+                else local.year + (int(match.group(1)) < local.month)
+            )
+        elif "tháng sau" in text:
+            month = local.month % 12 + 1
+            year = local.year + (local.month == 12)
+        else:
+            return None, None
+        start = datetime(year, month, 1, tzinfo=local.tzinfo)
+        end = datetime(year + (month == 12), month % 12 + 1, 1, tzinfo=local.tzinfo)
+        return start, end
+
+    def _parse(self, text: str, state: DialogueState) -> Understanding:
         norm = " ".join(text.casefold().strip().split())
         quantity_match = _QUANTITY.search(norm)
         number = Decimal(quantity_match.group(1).replace(",", ".")) if quantity_match else None
@@ -60,6 +128,16 @@ class RuleBasedVietnameseNLU:
         quantity = int(number) if number is not None else None
         city = self._extract_city(norm)
         intent = self._classify_intent(norm)
+        if (
+            state.faq_topic
+            and norm.startswith(("còn ", "có "))
+            and not any(k in norm for k in ("sự kiện", "vé của tôi", "đơn hàng", "giao dịch"))
+        ):
+            intent = Intent.POLICY_FAQ
+        if state.active_intent is Intent.SEARCH_EVENT and (
+            "bỏ giới hạn giá" in norm or norm.startswith(("tháng ", "bỏ ngày", "bỏ giới hạn ngày"))
+        ):
+            intent = Intent.SEARCH_EVENT
         removed: set[Slot] = set()
         clear_group = None
         if any(x in norm for x in ("bắt đầu lại", "xóa tất cả tiêu chí", "xóa toàn bộ tiêu chí")):
@@ -80,6 +158,16 @@ class RuleBasedVietnameseNLU:
             removed.add(Slot.BUDGET_AMOUNT)
             state = merge_state(state, DialoguePatch(removed_slots=frozenset(removed)))
 
+        if any(x in norm for x in ("bỏ giới hạn ngày", "bỏ ngày", "mọi thời gian")):
+            removed.update((Slot.START_FROM, Slot.START_BEFORE))
+        if (
+            state.active_intent is Intent.SEARCH_EVENT
+            and state.budget_scope is Scope.TOTAL
+            and state.quantity is None
+            and _QUANTITY.fullmatch(norm)
+        ):
+            intent = Intent.SEARCH_EVENT
+
         # Only a scope-only reply resumes the active task; a new task wins.
         scope_resolution = self._scope_from_text(norm)
         if (
@@ -89,7 +177,7 @@ class RuleBasedVietnameseNLU:
             and _MONEY.search(norm) is None
             and re.fullmatch(
                 r"(?:tính |là |cho |ngân sách )*(?:tổng(?: cộng)?|cả nhóm|mỗi vé|"
-                r"mỗi ghế|từng vé|một vé)(?: (?:nhé|ạ|thôi))?[.!?]*",
+                r"mỗi ghế|từng vé|một vé|1 vé)(?: (?:nhé|ạ|thôi))?[.!?]*",
                 norm,
             )
         ):
@@ -124,7 +212,11 @@ class RuleBasedVietnameseNLU:
         city_continuation = (
             clear_group is None
             and state.active_intent in (Intent.SEARCH_EVENT, Intent.TICKET_RECOMMEND)
-            and _CITY_UPDATE.fullmatch(norm) is not None
+            and (
+                _CITY_UPDATE.fullmatch(norm) is not None
+                or bool(removed)
+                or norm.startswith("tháng ")
+            )
         )
         if city_continuation and state.active_intent is not None:
             # Only a recognized filter-only turn resumes the active task.
@@ -138,6 +230,9 @@ class RuleBasedVietnameseNLU:
             quantity=quantity,
             budget_amount=budget_amount,
             budget_scope=budget_scope,
+            price_comparison=("LT" if "dưới" in norm else "LTE")
+            if budget_amount is not None
+            else None,
             search_query=search_query,
             active_intent=intent if intent is not Intent.CLARIFY else None,
             removed_slots=frozenset(removed),
@@ -170,7 +265,7 @@ class RuleBasedVietnameseNLU:
 
     @staticmethod
     def _scope_from_text(norm: str) -> Scope:
-        if any(marker in norm for marker in ("mỗi vé", "một vé", "từng vé", "mỗi ghế")):
+        if any(marker in norm for marker in ("mỗi vé", "một vé", "1 vé", "từng vé", "mỗi ghế")):
             return Scope.PER_TICKET
         if any(marker in norm for marker in ("tổng", "tổng cộng", "cả nhóm", "cả 3", "cả 2")):
             return Scope.TOTAL
@@ -200,6 +295,23 @@ class RuleBasedVietnameseNLU:
     def _classify_intent(norm: str) -> Intent:
         if any(k in norm for k in ("hoàn tiền", "hoàn vé", "refund")):
             return Intent.REFUND_POLICY
+        if any(
+            k in norm
+            for k in (
+                "momo",
+                "vnpay",
+                "trả tiền kiểu",
+                "phương thức thanh toán",
+                "hướng dẫn",
+                "cách mua",
+                "cách thanh toán",
+            )
+        ) or (
+            "thanh toán" in norm
+            and any(k in norm for k in ("có ", "không", "bằng "))
+            and not any(k in norm for k in ("của tôi", "trạng thái", "đơn hàng"))
+        ):
+            return Intent.POLICY_FAQ
         if "thanh toán" in norm or "giao dịch" in norm:
             return Intent.PAYMENT_STATUS
         if "đơn hàng" in norm or "đơn của" in norm:

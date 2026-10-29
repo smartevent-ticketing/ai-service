@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from enum import StrEnum
+from datetime import datetime
 
 MAX_BUDGET_VND = 1_000_000_000
 MAX_MESSAGE_STATE_TEXT = 120
@@ -22,6 +23,7 @@ class Intent(StrEnum):
     ORDER_STATUS = "ORDER_STATUS"
     PAYMENT_STATUS = "PAYMENT_STATUS"
     MY_TICKETS = "MY_TICKETS"
+    POLICY_FAQ = "POLICY_FAQ"
     REFUND_POLICY = "REFUND_POLICY"
     BOOKING_GUIDANCE = "BOOKING_GUIDANCE"
     OUT_OF_SCOPE = "OUT_OF_SCOPE"
@@ -35,6 +37,9 @@ class Scope(StrEnum):
 
 
 class ClarificationReason(StrEnum):
+    DATE_INVALID = "DATE_INVALID"
+    MODEL_OUTPUT_INVALID = "MODEL_OUTPUT_INVALID"
+    QUANTITY_REQUIRED = "QUANTITY_REQUIRED"
     BUDGET_SCOPE = "BUDGET_SCOPE"
     BUDGET_OUT_OF_RANGE = "BUDGET_OUT_OF_RANGE"
     QUANTITY_OUT_OF_RANGE = "QUANTITY_OUT_OF_RANGE"
@@ -48,6 +53,11 @@ class Slot(StrEnum):
     EVENT_NAME = "event_name"
     SEARCH_QUERY = "search_query"
     ACTIVE_INTENT = "active_intent"
+
+    START_FROM = "start_from"
+    START_BEFORE = "start_before"
+    PRICE_COMPARISON = "price_comparison"
+    FAQ_TOPIC = "faq_topic"
 
 
 class ClearGroup(StrEnum):
@@ -71,6 +81,21 @@ def _validate_optional_text(name: str, value: str | None, maximum: int) -> None:
         raise ValueError(f"{name} must contain 1..{maximum} characters")
 
 
+def _validate_filters(
+    start: datetime | None, end: datetime | None, comparison: str | None, topic: str | None
+) -> None:
+    for value in (start, end):
+        if value is not None and (
+            not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None
+        ):
+            raise ValueError("event dates must include a timezone")
+    if start is not None and end is not None and start >= end:
+        raise ValueError("event start range must be increasing")
+    if comparison not in (None, "LT", "LTE"):
+        raise ValueError("price comparison must be LT or LTE")
+    _validate_optional_text("faq_topic", topic, 120)
+
+
 @dataclass(frozen=True, slots=True)
 class DialogueState:
     city: str | None = None
@@ -80,8 +105,15 @@ class DialogueState:
     event_name: str | None = None
     search_query: str | None = None
     active_intent: Intent | None = None
+    start_from: datetime | None = None
+    start_before: datetime | None = None
+    price_comparison: str | None = None
+    faq_topic: str | None = None
 
     def __post_init__(self) -> None:
+        _validate_filters(self.start_from, self.start_before, self.price_comparison, self.faq_topic)
+        if self.budget_amount is None and self.price_comparison is not None:
+            raise ValueError("price comparison requires a budget")
         if not isinstance(self.budget_scope, Scope):
             raise ValueError("budget_scope must be a Scope")
         if self.active_intent is not None and not isinstance(self.active_intent, Intent):
@@ -110,10 +142,15 @@ class DialoguePatch:
     event_name: str | None = None
     search_query: str | None = None
     active_intent: Intent | None = None
+    start_from: datetime | None = None
+    start_before: datetime | None = None
+    price_comparison: str | None = None
+    faq_topic: str | None = None
     removed_slots: frozenset[Slot] = frozenset()
     clear_group: ClearGroup | None = None
 
     def __post_init__(self) -> None:
+        _validate_filters(self.start_from, self.start_before, self.price_comparison, self.faq_topic)
         if self.budget_scope is not None and not isinstance(self.budget_scope, Scope):
             raise ValueError("budget_scope patch must be a Scope")
         if self.active_intent is not None and not isinstance(self.active_intent, Intent):
@@ -143,6 +180,7 @@ class Understanding:
     patch: DialoguePatch = DialoguePatch()
     needs_clarification: bool = False
     clarification_reason: ClarificationReason | None = None
+    mode: str = "rule"
 
     def __post_init__(self) -> None:
         if not isinstance(self.intent, Intent) or not isinstance(self.patch, DialoguePatch):
@@ -162,11 +200,17 @@ def merge_state(previous: DialogueState, patch: DialoguePatch) -> DialogueState:
     if patch.clear_group is ClearGroup.ALL_SLOTS:
         removed.update(Slot)
     elif patch.clear_group is ClearGroup.EVENT_FILTERS:
-        removed.update((Slot.CITY, Slot.EVENT_NAME, Slot.SEARCH_QUERY))
+        removed.update(
+            (Slot.CITY, Slot.EVENT_NAME, Slot.SEARCH_QUERY, Slot.START_FROM, Slot.START_BEFORE)
+        )
     elif patch.clear_group is ClearGroup.TICKET_PREFERENCES:
-        removed.update((Slot.QUANTITY, Slot.BUDGET_AMOUNT, Slot.BUDGET_SCOPE))
+        removed.update(
+            (Slot.QUANTITY, Slot.BUDGET_AMOUNT, Slot.BUDGET_SCOPE, Slot.PRICE_COMPARISON)
+        )
     if Slot.BUDGET_AMOUNT in removed:
-        removed.add(Slot.BUDGET_SCOPE)
+        removed.update((Slot.BUDGET_SCOPE, Slot.PRICE_COMPARISON))
+    if Slot.START_FROM in removed or Slot.START_BEFORE in removed:
+        removed.update((Slot.START_FROM, Slot.START_BEFORE))
     values = {}
     for field in fields(DialogueState):
         value = getattr(defaults if Slot(field.name) in removed else previous, field.name)

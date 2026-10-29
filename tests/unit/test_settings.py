@@ -90,4 +90,4 @@ def test_bootstrap_builds_nlu_by_backend_setting() -> None:
         )
     )
     assert isinstance(chat_rag_ollama._policies._synthesizer, OllamaPolicySynthesizer)
-    assert chat_rag_ollama._policies.answer_mode == "generative"
+    assert chat_rag_ollama._policies.answer_mode == "verified_extractive"

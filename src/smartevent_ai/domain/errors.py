@@ -15,3 +15,7 @@ class ToolUnavailable(SmartEventError):
 
 class BackendUnavailable(SmartEventError):
     """Backend response is untrusted, inaccessible or too large."""
+
+
+class ModelUnavailable(SmartEventError):
+    """NLU provider exceeded the request budget."""

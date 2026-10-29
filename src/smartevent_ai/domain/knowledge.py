@@ -242,6 +242,7 @@ class Citation:
 class PolicyAnswer:
     answer: str
     citations: tuple[Citation, ...] = ()
+    mode: str = "extractive"
 
 
 @dataclass(frozen=True, slots=True)

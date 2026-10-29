@@ -74,7 +74,13 @@ async def test_city_followup_executes_search_with_preserved_query(message, city)
         (
             "Tìm concert 3 vé dưới 800 nghìn tổng",
             3,
-            {"q": "concert", "page": 0, "size": 10},
+            {
+                "q": "concert",
+                "page": 0,
+                "size": 10,
+                "maxPrice": "266666.6666666666666666666667",
+                "priceComparison": "LT",
+            },
         ),
         (
             "Tìm concert 2026 2 vé ở Hà Nội",
@@ -99,7 +105,17 @@ async def test_search_waits_for_budget_scope_then_sends_clean_query():
     assert tools.calls == []
     result = await chat.handle(ChatCommand("Tính tổng nhé", previous_state=first.state))
     assert tools.calls == [
-        ("search_events", {"q": "concert", "city": "Hà Nội", "page": 0, "size": 10})
+        (
+            "search_events",
+            {
+                "q": "concert",
+                "city": "Hà Nội",
+                "page": 0,
+                "size": 10,
+                "maxPrice": "266666.6666666666666666666667",
+                "priceComparison": "LT",
+            },
+        )
     ]
     assert result.state.quantity == 3
     assert result.state.budget_scope is Scope.TOTAL

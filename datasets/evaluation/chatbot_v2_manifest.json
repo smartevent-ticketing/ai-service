@@ -1,0 +1,14 @@
+{
+  "purpose": "DEVELOPMENT_ACCEPTANCE_CANDIDATE",
+  "reference_time": "2026-10-30T00:00:00+07:00",
+  "case_count": 100,
+  "groups": {
+    "search": 30,
+    "dialogue": 25,
+    "faq": 25,
+    "negative": 20
+  },
+  "sha256": "42b9bf33fdfc0be63eb6b07752d2fb233026d2ce76f0dc8777465e1e4b4c3fad",
+  "status": "REQUIRES_INDEPENDENT_EXPECTATION_REVIEW",
+  "note": "Seeds do not constitute live backend/model evaluation or policy approval. Lock independently reviewed event/source expectations before acceptance; do not tune on test split."
+}

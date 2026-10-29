@@ -10,7 +10,7 @@
 Dịch vụ được tổ chức theo **Clean Architecture**, tách xử lý hội thoại khỏi giao thức HTTP, cấu hình và kết nối backend. Mục tiêu là hỗ trợ người dùng tìm hiểu sự kiện, làm rõ nhu cầu chọn vé và nhận hướng dẫn trên SmartEvent trong phạm vi quyền truy cập được kiểm chứng.
 
 > [!IMPORTANT]
-> **Phiên bản 0.2.0 là nền tảng phát triển, chưa sẵn sàng cho production.** Đã có ingest, chunking theo tokenizer, retrieval trích đoạn và citation. **RAG và 14 business tool mặc định bị tắt**; corpus khởi tạo đang là bản nháp. Embedding/hybrid mới dùng để benchmark offline; LLM/QLoRA, JEV và cơ chế ủy quyền dữ liệu tài khoản chưa được tích hợp. Dịch vụ không thực hiện giữ chỗ, đặt vé, thanh toán hoặc hoàn tiền thay người dùng.
+> **Phiên bản 0.2.0 là nền tảng phát triển, chưa sẵn sàng cho production.** Đã có ingest, chunking theo tokenizer, retrieval trích đoạn và citation. **RAG và 14 business tool mặc định bị tắt**; corpus khởi tạo đang là bản nháp. Embedding/hybrid mới dùng để benchmark offline; Adapter Ollama/PEFT và parser model đã có nhưng chưa được nghiệm thu với model thật; JEV và ủy quyền dữ liệu tài khoản vẫn chưa hoàn tất. Dịch vụ không thực hiện giữ chỗ, đặt vé, thanh toán hoặc hoàn tiền thay người dùng.
 
 **Đi đến:** [Năng lực hiện tại](#năng-lực-hiện-tại) · [Tech stack](#tech-stack) · [Kiến trúc](#kiến-trúc) · [Chạy nhanh](#bắt-đầu-nhanh) · [API](#api) · [Cấu hình](#cấu-hình) · [Chunking và RAG](#chunking-và-rag) · [Kiểm chứng](#kiểm-chứng-và-cicd) · [Tài liệu](#tài-liệu-và-lộ-trình)
 
@@ -19,7 +19,7 @@ Dịch vụ được tổ chức theo **Clean Architecture**, tách xử lý h�
 | Thành phần | Hiện trạng |
 | :--- | :--- |
 | Hội thoại tiếng Việt | Nhận diện ý định bằng luật; trích xuất thành phố, số lượng, ngân sách và từ khóa tìm kiếm |
-| Theo dõi ngữ cảnh | Truyền trạng thái giữa các lượt; hỗ trợ làm rõ ngân sách, cập nhật và xóa điều kiện đã hỗ trợ |
+| Theo dõi ngữ cảnh | Truyền trạng thái giữa các lượt; nhận TP.HCM/1 vé, cập nhật/xóa ngân sách và khoảng tháng với đồng hồ có thể inject |
 | Xếp hạng phương án vé | Hàm thuần xác định trong domain; chưa nối với tồn kho thật hoặc luồng đề xuất trực tiếp |
 | Gateway nghiệp vụ | Có registry, schema, projection và gate kiểm soát; mọi tool vẫn tắt |
 | HTTP transport | Giới hạn host/path, phương thức GET, thời gian, kích thước và cấu trúc JSON; chặn redirect và các đường dẫn GET có tác dụng ghi đã biết |
@@ -210,7 +210,8 @@ Kết quả mặc định:
 {
   "status": "degraded",
   "business_tools_enabled": [],
-  "model_backend": "rule_based_baseline_only",
+  "model_backend": "rule",
+  "last_nlu_mode": "not_probed",
   "policy_retrieval": {"status": "disabled", "answer_mode": "extractive"}
 }
 ```
@@ -425,3 +426,14 @@ Các bước phát triển tiếp theo tập trung vào:
 Dataset tổng hợp mẫu chỉ minh họa công cụ. Phân tách không đủ train/validation/test sẽ được đánh dấu `evaluation_ready=false`; chưa có cơ sở dùng bộ mẫu này để công bố chất lượng model.
 
 Khi đóng góp, giữ nguyên `docs/contexts/v1.2/`, đặt phần đính chính trong `docs/architecture/`, cập nhật kiểm thử nếu thay đổi hành vi và đồng bộ source manifest trước khi push. Không đưa `.env`, credential, báo cáo local, cache hoặc sản phẩm build vào Git.
+
+
+## Chatbot v2 — triển khai theo kế hoạch R2
+
+Mã nguồn mới có state `start_from/start_before/price_comparison/faq_topic`, criteria chuyển ngày/giá tới backend, response `events/actions/has_more/mode/status`, parser SET/REMOVE/CLEAR dùng chung cho model và routing FAQ công khai. DTO cũ vẫn dùng được; field mới optional, field lạ vẫn bị từ chối. Deploy backend → AI → web, rollback web trước AI nếu hạ phiên bản schema.
+
+Backend API nhận `startFrom` bao gồm và `startBefore` không bao gồm (ISO-8601 có timezone), `maxPrice`, `priceComparison=LT|LTE`. Tổng ngân sách được tính trên số lượng và giá vé niêm yết; chatbot không cam kết phí thanh toán hoặc giữ chỗ. Bộ lọc mới còn bị khóa bởi gate trước khi có bằng chứng PostgreSQL/zero-write/visibility thật.
+
+RAG hiện chặn bản sinh không tương đương toàn bộ bằng chứng và trả trích đoạn dự phòng; mode/readiness không gọi đó là generative đã nghiệm thu. Dịch vụ pgvector riêng và HttpPolicyReader đã có mã nguồn, tham khảo `docs/architecture/ADR-004-chatbot-contract-and-knowledge-service.md` và repo infra `services/knowledge/README.md`. Remote reader vẫn yêu cầu hai gate RAG PASS, ngoài token và trust anchors của dịch vụ.
+
+`POLICY_BACKEND=artifact` là mặc định; lựa chọn `http` dùng `KNOWLEDGE_BASE_URL` cố định và `KNOWLEDGE_SERVICE_TOKEN` phía server. Corpus/model không tự được duyệt khi đổi biến môi trường. Dataset 100 ca tại `datasets/evaluation/` là ứng viên cần review kỳ vọng độc lập, chưa phải báo cáo đánh giá model thật.

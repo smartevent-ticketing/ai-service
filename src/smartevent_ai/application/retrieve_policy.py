@@ -129,8 +129,43 @@ class RetrievePolicy:
         if self._synthesizer is not None:
             try:
                 synthesized = self._synthesizer.synthesize(query, raw_passages)
-                if synthesized and isinstance(synthesized, str) and synthesized.strip():
-                    return PolicyAnswer(synthesized.strip(), tuple(citations))
+                # Conservative verifier: until an independently evaluated entailment
+                # checker is approved, accept only the complete extractive evidence.
+                # Substrings may omit an exception or invert a source's meaning.
+                if isinstance(synthesized, str) and " ".join(synthesized.split()) == " ".join(
+                    raw_passages.split()
+                ):
+                    fresh_snapshot = self._store.snapshot(self._clock.now())
+                    if (
+                        fresh_snapshot.catalog_sha256 != current.catalog_sha256
+                        or fresh_snapshot.release_id != current.release_id
+                    ):
+                        raise KnowledgeError("Evidence authority changed during generation")
+                    if any(
+                        c.chunk_id
+                        not in {
+                            x.chunk_id for x in eligible_chunks(fresh_snapshot, self._clock.now())
+                        }
+                        for c in citations
+                    ):
+                        raise KnowledgeError("Evidence expired during generation")
+                    return PolicyAnswer(
+                        synthesized.strip(), tuple(citations), "verified_extractive"
+                    )
+            except KnowledgeError:
+                return PolicyAnswer(NO_EVIDENCE)
             except Exception:
-                return PolicyAnswer(raw_passages, tuple(citations))
-        return PolicyAnswer(raw_passages, tuple(citations))
+                synthesized = None  # Explicitly discard failed generation before fallback.
+        final = self._store.snapshot(self._clock.now())
+        valid = {c.chunk_id for c in eligible_chunks(final, self._clock.now())}
+        if (
+            final.release_id != current.release_id
+            or final.catalog_sha256 != current.catalog_sha256
+            or any(c.chunk_id not in valid for c in citations)
+        ):
+            return PolicyAnswer(NO_EVIDENCE)
+        return PolicyAnswer(
+            raw_passages,
+            tuple(citations),
+            "extractive_fallback" if self._synthesizer else "extractive",
+        )

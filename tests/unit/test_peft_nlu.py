@@ -82,8 +82,8 @@ def test_malformed_json_falls_back_to_rule_nlu_safely() -> None:
     # Should not raise exception, should fall back to rule-based parsing
     result = nlu.parse("Tìm concert ở Hà Nội", DialogueState())
 
-    assert result.intent == Intent.SEARCH_EVENT
-    assert result.patch.city == "Hà Nội"
+    assert result.intent == Intent.CLARIFY
+    assert result.needs_clarification
 
 
 def test_generator_exception_falls_back_to_rule_nlu() -> None:

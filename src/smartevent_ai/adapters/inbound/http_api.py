@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from uuid import UUID
+from datetime import datetime
+from dataclasses import asdict
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -12,7 +14,13 @@ from smartevent_ai import __version__
 from smartevent_ai.adapters.inbound.request_telemetry import RequestTelemetry
 from smartevent_ai.application.models import ChatCommand, ChatResult
 from smartevent_ai.domain.dialogue import DialogueState, Intent, Scope
-from smartevent_ai.domain.errors import SmartEventError
+from smartevent_ai.domain.errors import (
+    SmartEventError,
+    BackendUnavailable,
+    ContractViolation,
+    ToolUnavailable,
+    ModelUnavailable,
+)
 from smartevent_ai.infrastructure.settings import Settings
 
 
@@ -26,6 +34,10 @@ class DialogueStateDTO(BaseModel):
     event_name: str | None = Field(default=None, min_length=1, max_length=120)
     search_query: str | None = Field(default=None, min_length=1, max_length=120)
     active_intent: Intent | None = None
+    start_from: datetime | None = None
+    start_before: datetime | None = None
+    price_comparison: str | None = Field(default=None, pattern="^(LT|LTE)$")
+    faq_topic: str | None = Field(default=None, min_length=1, max_length=120)
 
     @field_validator("city", "event_name", "search_query")
     @classmethod
@@ -41,30 +53,15 @@ class DialogueStateDTO(BaseModel):
     def validate_budget_scope(self) -> "DialogueStateDTO":
         if self.budget_amount is None and self.budget_scope is not Scope.UNKNOWN:
             raise ValueError("budget_scope requires budget_amount")
+        self.to_domain()
         return self
 
     def to_domain(self) -> DialogueState:
-        return DialogueState(
-            city=self.city,
-            quantity=self.quantity,
-            budget_amount=self.budget_amount,
-            budget_scope=self.budget_scope,
-            event_name=self.event_name,
-            search_query=self.search_query,
-            active_intent=self.active_intent,
-        )
+        return DialogueState(**self.model_dump())
 
     @classmethod
     def from_domain(cls, state: DialogueState) -> "DialogueStateDTO":
-        return cls(
-            city=state.city,
-            quantity=state.quantity,
-            budget_amount=state.budget_amount,
-            budget_scope=state.budget_scope,
-            event_name=state.event_name,
-            search_query=state.search_query,
-            active_intent=state.active_intent,
-        )
+        return cls(**asdict(state))
 
 
 class ChatRequestDTO(BaseModel):
@@ -101,6 +98,32 @@ class CitationDTO(BaseModel):
     end: int
 
 
+class EventCardDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: UUID
+    name: str
+    slug: str
+    detail_path: str
+    city: str | None = None
+    venue_name: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    price: str | None = None
+    currency: str | None = None
+    ticket_type_id: UUID | None = None
+    sale_phase_id: UUID | None = None
+    price_observed_at: str | None = None
+    price_basis: str | None = None
+
+
+class NavigationActionDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: str = Field(pattern="^(VIEW_EVENT|BROWSE_EVENTS)$")
+    route: str = Field(pattern=r"^/events(?:/[a-zA-Z0-9_-]+)?$")
+    label: str
+    event_id: UUID | None = None
+
+
 class ChatResponseDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -110,6 +133,11 @@ class ChatResponseDTO(BaseModel):
     answer: str
     grounding: str
     tool_called: str | None = None
+    events: list[EventCardDTO] = Field(default_factory=list)
+    actions: list[NavigationActionDTO] = Field(default_factory=list)
+    has_more: bool = False
+    mode: str = "rule"
+    status: str = "OK"
     citations: list[CitationDTO] = Field(default_factory=list)
 
     @classmethod
@@ -121,6 +149,11 @@ class ChatResponseDTO(BaseModel):
             answer=result.answer,
             grounding=result.grounding.value,
             tool_called=result.tool_called,
+            events=[EventCardDTO(**asdict(e)) for e in result.events],
+            actions=[NavigationActionDTO(**asdict(a)) for a in result.actions],
+            has_more=result.has_more,
+            mode=result.mode,
+            status=result.status,
             citations=[
                 CitationDTO(
                     source_id=c.source_id,
@@ -155,9 +188,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def ready() -> dict[str, object]:
         enabled = gateway.available_names()
         return {
-            "status": "degraded" if not enabled else "ready",
+            "status": "ready"
+            if enabled
+            and (configuration.nlu_backend == "rule" or app.state.chat.last_nlu_mode == "model")
+            else "degraded",
             "business_tools_enabled": enabled,
             "model_backend": configuration.nlu_backend,
+            "last_nlu_mode": app.state.chat.last_nlu_mode,
             "policy_retrieval": {
                 "status": app.state.chat.policy_status(),
                 "answer_mode": app.state.chat.policy_answer_mode(),
@@ -171,10 +208,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(SmartEventError)
     async def domain_error(request: Request, exc: SmartEventError) -> JSONResponse:
         # Do not expose internal backend content, secrets or contract details.
+        if isinstance(exc, ModelUnavailable):
+            return JSONResponse(
+                status_code=503,
+                content={"code": "MODEL_UNAVAILABLE", "message": "Model unavailable"},
+            )
         return JSONResponse(
-            status_code=422,
+            status_code=502
+            if isinstance(exc, (BackendUnavailable, ContractViolation))
+            else 503
+            if isinstance(exc, ToolUnavailable)
+            else 422,
             content={
-                "code": exc.__class__.__name__,
+                "code": "BACKEND_UNAVAILABLE"
+                if isinstance(exc, BackendUnavailable)
+                else "UPSTREAM_CONTRACT_ERROR"
+                if isinstance(exc, ContractViolation)
+                else "TOOL_DISABLED"
+                if isinstance(exc, ToolUnavailable)
+                else "INVALID_REQUEST",
                 "message": "Request could not be completed",
             },
         )

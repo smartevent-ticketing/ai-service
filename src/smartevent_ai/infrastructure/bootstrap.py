@@ -10,11 +10,15 @@ from smartevent_ai.adapters.outbound.read_only_gateway import ReadOnlyToolGatewa
 from smartevent_ai.adapters.outbound.rule_nlu import RuleBasedVietnameseNLU
 from smartevent_ai.adapters.outbound.safe_transport import SafeBackendTransport
 from smartevent_ai.application.chat import ChatUseCase
-from smartevent_ai.application.knowledge_ports import PolicySynthesizer
+from smartevent_ai.application.knowledge_ports import PolicySynthesizer, PolicyReader
+from smartevent_ai.adapters.outbound.knowledge.http_reader import HttpPolicyReader
 from smartevent_ai.application.ports import LanguageUnderstanding
 from smartevent_ai.infrastructure.settings import Settings
 from smartevent_ai.infrastructure.knowledge_config import ReviewedRagConfig
-from smartevent_ai.infrastructure.knowledge_runtime import RuntimePolicyReader
+from smartevent_ai.infrastructure.knowledge_runtime import (
+    RuntimePolicyReader,
+    GateControlledPolicyReader,
+)
 
 
 def build_chat(settings: Settings) -> tuple[ChatUseCase, ReadOnlyToolGateway]:
@@ -35,11 +39,19 @@ def build_chat(settings: Settings) -> tuple[ChatUseCase, ReadOnlyToolGateway]:
             load_4bit=settings.rag_load_4bit,
         )
 
-    policies = RuntimePolicyReader(
+    policies: PolicyReader = RuntimePolicyReader(
         ReviewedRagConfig(settings.effective_config_dir),
         test_environment=settings.app_env == "test",
         synthesizer=synthesizer,
     )
+
+    if settings.policy_backend == "http":
+        policies = GateControlledPolicyReader(
+            HttpPolicyReader(
+                settings.knowledge_base_url, settings.knowledge_service_token.get_secret_value()
+            ),
+            settings.gates_path,
+        )
 
     nlu: LanguageUnderstanding
     if settings.nlu_backend == "ollama":

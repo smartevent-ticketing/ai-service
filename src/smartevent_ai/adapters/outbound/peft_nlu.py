@@ -8,6 +8,8 @@ gracefully to deterministic rules upon any model, JSON or range violation.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone, timedelta
+from smartevent_ai.adapters.outbound.model_understanding import parse_model_understanding
 import logging
 import threading
 from pathlib import Path
@@ -15,13 +17,10 @@ from typing import Any, Callable
 
 from smartevent_ai.adapters.outbound.rule_nlu import CITY_ALIASES, RuleBasedVietnameseNLU
 from smartevent_ai.domain.dialogue import (
-    MAX_BUDGET_VND,
     ClarificationReason,
-    DialoguePatch,
     DialogueState,
     Intent,
     Scope,
-    Slot,
     Understanding,
 )
 
@@ -33,7 +32,7 @@ SYSTEM_PROMPT = (
     "- proposed_action: Hành động chỉ đọc (SEARCH_EVENTS, RUN_TICKET_OPTIMIZER, EXPLAIN_WRITE_LIMITATION, RETRIEVE_POLICY, ...)\n"
     "- entities: dict các thực thể (city, quantity, ticket_type_name, ...)\n"
     "- state_delta: danh sách các thao tác cập nhật trạng thái nếu có.\n"
-    "TUYỆT ĐỐI không đề xuất hành động ghi dữ liệu. Xuất JSON hợp lệ."
+    "Hỗ trợ POLICY_FAQ cho hướng dẫn/thanh toán chung; PAYMENT_STATUS chỉ trạng thái giao dịch cá nhân. entities chỉ dùng city, quantity (số nguyên), budget_amount (số nguyên VND), budget_scope, search_query, event_name, start_from/start_before (ISO-8601 có timezone), price_comparison (LT/LTE), faq_topic. state_delta dùng op SET/REMOVE với slot/value, hoặc op CLEAR với group ALL_SLOTS/EVENT_FILTERS/TICKET_PREFERENCES. TUYỆT ĐỐI không đề xuất hành động ghi dữ liệu. Xuất JSON hợp lệ."
 )
 
 
@@ -52,6 +51,7 @@ class PeftTransformerNLU:
         self._load_4bit = load_4bit
         self._generator = generator
         self._fallback_nlu = RuleBasedVietnameseNLU()
+        self._inference_slots = threading.BoundedSemaphore(1)
         self._model: Any = None
         self._tokenizer: Any = None
         self._lock = threading.Lock()
@@ -155,6 +155,12 @@ class PeftTransformerNLU:
                 f"Tin nhắn người dùng: {user_text}"
             )
 
+        user_content = (
+            "Đồng hồ tham chiếu (UTC+07:00): "
+            + datetime.now(timezone(timedelta(hours=7))).isoformat()
+            + "\n"
+            + user_content
+        )
         if self._generator is not None:
             return self._generator(user_content)
 
@@ -203,110 +209,38 @@ class PeftTransformerNLU:
         return city.strip()
 
     def parse(self, text: str, state: DialogueState) -> Understanding:
+        from dataclasses import replace
+
+        if not self._inference_slots.acquire(blocking=False):
+            return replace(self._fallback_nlu.parse(text, state), mode="fallback")
+        try:
+            return self._parse_once(text, state)
+        finally:
+            self._inference_slots.release()
+
+    def _parse_once(self, text: str, state: DialogueState) -> Understanding:
         try:
             raw_response = self._generate(text, state)
             clean_str = self._clean_json_str(raw_response)
             payload: dict[str, Any] = json.loads(clean_str)
 
-            # Intent extraction with case-insensitivity
-            raw_intent = str(payload.get("primary_intent", "")).strip().upper()
-            try:
-                intent = Intent(raw_intent)
-            except ValueError:
-                intent = Intent.OUT_OF_SCOPE
+            if "giữ vé" in text.lower():
+                payload["proposed_action"] = "EXPLAIN_WRITE_LIMITATION"
+            result = parse_model_understanding(payload, state)
+            return result
 
-            entities: dict[str, Any] = payload.get("entities") or {}
-
-            # City normalization
-            city = self._normalize_city(entities.get("city"))
-
-            # Search query
-            search_query = entities.get("search_query") or entities.get("event_name")
-            if intent is Intent.SEARCH_EVENT and not search_query:
-                search_query = entities.get("category")
-
-            # Quantity extraction and range guard
-            quantity = entities.get("quantity")
-            if quantity is not None:
-                try:
-                    qty_int = int(quantity)
-                    if not (1 <= qty_int <= 20):
-                        return Understanding(
-                            intent=intent
-                            if intent != Intent.OUT_OF_SCOPE
-                            else Intent.TICKET_RECOMMEND,
-                            patch=DialoguePatch(
-                                city=city,
-                                event_name=entities.get("event_name"),
-                                search_query=search_query,
-                                active_intent=intent,
-                            ),
-                            needs_clarification=True,
-                            clarification_reason=ClarificationReason.QUANTITY_OUT_OF_RANGE,
-                        )
-                    quantity = qty_int
-                except (ValueError, TypeError):
-                    quantity = None
-
-            # Budget extraction
-            budget_amount = entities.get("budget_amount")
-            if budget_amount is not None:
-                try:
-                    b_int = int(budget_amount)
-                    if not (0 <= b_int <= MAX_BUDGET_VND):
-                        return Understanding(
-                            intent=intent,
-                            patch=DialoguePatch(
-                                city=city,
-                                quantity=quantity,
-                                event_name=entities.get("event_name"),
-                                search_query=search_query,
-                                active_intent=intent,
-                            ),
-                            needs_clarification=True,
-                            clarification_reason=ClarificationReason.BUDGET_OUT_OF_RANGE,
-                        )
-                    budget_amount = b_int
-                except (ValueError, TypeError):
-                    budget_amount = None
-
-            budget_scope = Scope.UNKNOWN
-            raw_scope = entities.get("budget_scope")
-            if raw_scope is not None:
-                raw_scope = str(raw_scope).strip().upper()
-            if raw_scope in (Scope.TOTAL, Scope.PER_TICKET):
-                budget_scope = Scope(raw_scope)
-
-            # Proposed action and READ_ONLY safety gate
-            proposed_action = payload.get("proposed_action", "")
-            if proposed_action == "EXPLAIN_WRITE_LIMITATION" or "giữ vé" in text.lower():
-                intent = Intent.BOOKING_GUIDANCE
-
-            removed_slots: set[Slot] = set()
-            if budget_amount is not None:
-                resolved_scope = budget_scope
-                if budget_scope is Scope.UNKNOWN and state.budget_scope is not Scope.UNKNOWN:
-                    removed_slots.add(Slot.BUDGET_SCOPE)
-            elif state.budget_amount is not None and budget_scope is not Scope.UNKNOWN:
-                resolved_scope = budget_scope
-            else:
-                resolved_scope = None
-
-            patch = DialoguePatch(
-                city=city,
-                quantity=quantity,
-                budget_amount=budget_amount,
-                budget_scope=resolved_scope,
-                event_name=entities.get("event_name"),
-                search_query=search_query,
-                active_intent=intent,
-                removed_slots=frozenset(removed_slots),
+        except (ValueError, TypeError, KeyError):
+            return Understanding(
+                Intent.CLARIFY,
+                needs_clarification=True,
+                clarification_reason=ClarificationReason.MODEL_OUTPUT_INVALID,
+                mode="fallback",
             )
-            return Understanding(intent=intent, patch=patch)
-
         except Exception as e:
             logger.warning(
                 "PeftTransformerNLU generation/parsing failed (%s); falling back to RuleBasedNLU",
                 e,
             )
-            return self._fallback_nlu.parse(text, state)
+            from dataclasses import replace
+
+            return replace(self._fallback_nlu.parse(text, state), mode="fallback")

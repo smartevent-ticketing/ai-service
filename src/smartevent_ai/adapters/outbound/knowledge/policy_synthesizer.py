@@ -55,6 +55,7 @@ class OllamaPolicySynthesizer:
                 "stream": False,
                 "options": {
                     "temperature": 0.0,
+                    "num_predict": 512,
                 },
             }
             # Use build_request + send to adhere to static_verify.py AST checks
@@ -101,36 +102,38 @@ class PeftPolicySynthesizer:
             if self._adapter_path is None or not self._adapter_path.exists():
                 raise FileNotFoundError(f"RAG adapter path not found: {self._adapter_path}")
 
-        import torch as _torch
+            import torch as _torch
 
-        torch_any: Any = _torch
-        from peft import PeftModel
-        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+            torch_any: Any = _torch
+            from peft import PeftModel
+            from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            str(self._adapter_path), trust_remote_code=True
-        )
-        if self._tokenizer.pad_token is None:
-            self._tokenizer.pad_token = self._tokenizer.eos_token
-
-        quant_config = None
-        if torch_any.cuda.is_available() and self._load_4bit:
-            quant_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch_any.float16,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_use_double_quant=True,
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                str(self._adapter_path), trust_remote_code=True
             )
+            if self._tokenizer.pad_token is None:
+                self._tokenizer.pad_token = self._tokenizer.eos_token
 
-        base = AutoModelForCausalLM.from_pretrained(
-            self._base_model_name,
-            quantization_config=quant_config,
-            device_map="auto" if torch_any.cuda.is_available() else "cpu",
-            torch_dtype=torch_any.float16 if torch_any.cuda.is_available() else torch_any.float32,
-            trust_remote_code=True,
-        )
-        self._model = PeftModel.from_pretrained(base, str(self._adapter_path))
-        self._model.eval()
+            quant_config = None
+            if torch_any.cuda.is_available() and self._load_4bit:
+                quant_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch_any.float16,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_use_double_quant=True,
+                )
+
+            base = AutoModelForCausalLM.from_pretrained(
+                self._base_model_name,
+                quantization_config=quant_config,
+                device_map="auto" if torch_any.cuda.is_available() else "cpu",
+                torch_dtype=torch_any.float16
+                if torch_any.cuda.is_available()
+                else torch_any.float32,
+                trust_remote_code=True,
+            )
+            self._model = PeftModel.from_pretrained(base, str(self._adapter_path))
+            self._model.eval()
 
     def synthesize(self, query: str, context: str) -> str:
         try:

@@ -241,6 +241,12 @@ class ReadOnlyToolGateway:
         ):
             raise ToolUnavailable("Tool not approved for runtime")
 
+        if (
+            name == "search_events"
+            and any(key in arguments for key in ("maxPrice", "startFrom", "startBefore"))
+            and not self._gate_pass("PUBLISHED-CHILD")
+        ):
+            raise ToolUnavailable("Price search requires child visibility evidence")
         errors = list(
             Draft202012Validator(
                 tool["arguments_schema"], format_checker=FormatChecker()

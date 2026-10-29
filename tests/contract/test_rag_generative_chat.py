@@ -23,7 +23,7 @@ def make_mock_ollama_synthesizer_client(answer_text: str) -> httpx.Client:
     return httpx.Client(transport=httpx.MockTransport(handler))
 
 
-def test_generative_rag_chat_success_with_citations(tmp_path: Path) -> None:
+def test_generative_rag_rejects_unsupported_claims_with_extractive_fallback(tmp_path: Path) -> None:
     catalog, output, manifest, _ = make_bundle(tmp_path)
     config = configure(tmp_path, catalog, output, manifest)
 
@@ -46,14 +46,16 @@ def test_generative_rag_chat_success_with_citations(tmp_path: Path) -> None:
     with TestClient(app) as client:
         ready = client.get("/health/ready").json()
         assert ready["policy_retrieval"]["status"] == "ready"
-        assert ready["policy_retrieval"]["answer_mode"] == "generative"
+        assert ready["policy_retrieval"]["answer_mode"] == "verified_extractive"
 
         response = client.post("/api/v1/chat", json={"message": "Chính sách hoàn tiền"})
         assert response.status_code == 200
         data = response.json()
 
         assert data["grounding"] == "APPROVED_CORPUS"
-        assert data["answer"] == generated_reply
+        assert data["answer"] != generated_reply
+        assert "Ngoại lệ" in data["answer"]
+        assert data["mode"] == "extractive_fallback"
         assert len(data["citations"]) > 0
         assert data["citations"][0]["source_id"] == "TEST-REFUND"
 
