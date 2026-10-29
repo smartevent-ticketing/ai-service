@@ -239,9 +239,11 @@ def test_peft_nlu_tokenizer_fallback_when_adapter_lacks_config(tmp_path, monkeyp
         @classmethod
         def from_pretrained(cls, source: str, **kwargs) -> object:
             loaded_sources.append(source)
+
             class MockTok:
                 pad_token = None
                 eos_token = "<eos>"
+
             return MockTok()
 
     class MockAutoModel:
@@ -255,10 +257,12 @@ def test_peft_nlu_tokenizer_fallback_when_adapter_lacks_config(tmp_path, monkeyp
             class MockM:
                 def eval(self) -> None:
                     pass
+
             return MockM()
 
     import sys
     from unittest.mock import MagicMock
+
     mock_transformers = MagicMock()
     mock_transformers.AutoTokenizer = MockAutoTokenizer
     mock_transformers.AutoModelForCausalLM = MockAutoModel
@@ -280,4 +284,3 @@ def test_peft_nlu_tokenizer_fallback_when_adapter_lacks_config(tmp_path, monkeyp
 
     assert loaded_sources == ["test/base-model"]
     assert nlu._tokenizer is not None
-

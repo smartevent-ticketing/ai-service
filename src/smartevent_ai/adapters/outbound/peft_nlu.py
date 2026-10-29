@@ -66,15 +66,15 @@ class PeftTransformerNLU:
                 raise FileNotFoundError(f"Adapter path not found: {self._adapter_path}")
 
             import torch as _torch  # type: ignore[import-untyped]
+
             torch_any: Any = _torch
             from peft import PeftModel  # type: ignore[import-not-found]
             from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
             tokenizer_source = str(self._adapter_path)
-            has_tokenizer_config = (
-                (self._adapter_path / "tokenizer_config.json").exists()
-                or (self._adapter_path / "tokenizer.json").exists()
-            )
+            has_tokenizer_config = (self._adapter_path / "tokenizer_config.json").exists() or (
+                self._adapter_path / "tokenizer.json"
+            ).exists()
             if not has_tokenizer_config:
                 logger.info(
                     "Tokenizer config not found in %s; falling back to base model %s",
@@ -117,7 +117,9 @@ class PeftTransformerNLU:
                 self._base_model_name,
                 quantization_config=quant_config,
                 device_map="auto" if torch_any.cuda.is_available() else "cpu",
-                torch_dtype=torch_any.float16 if torch_any.cuda.is_available() else torch_any.float32,
+                torch_dtype=torch_any.float16
+                if torch_any.cuda.is_available()
+                else torch_any.float32,
                 trust_remote_code=True,
             )
             self._model = PeftModel.from_pretrained(base, str(self._adapter_path))
@@ -160,6 +162,7 @@ class PeftTransformerNLU:
         assert self._tokenizer is not None and self._model is not None
 
         import torch as _torch
+
         torch_any: Any = _torch
 
         messages = [

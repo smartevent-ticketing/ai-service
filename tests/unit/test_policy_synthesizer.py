@@ -153,4 +153,3 @@ def test_peft_policy_synthesizer_threading_lock() -> None:
 
     synth = PeftPolicySynthesizer()
     assert isinstance(synth._lock, type(threading.Lock()))
-

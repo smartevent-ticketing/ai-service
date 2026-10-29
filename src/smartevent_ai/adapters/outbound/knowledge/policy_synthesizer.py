@@ -102,6 +102,7 @@ class PeftPolicySynthesizer:
                 raise FileNotFoundError(f"RAG adapter path not found: {self._adapter_path}")
 
         import torch as _torch  # type: ignore[import-untyped]
+
         torch_any: Any = _torch
         from peft import PeftModel  # type: ignore[import-not-found]
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
@@ -140,6 +141,7 @@ class PeftPolicySynthesizer:
             assert self._tokenizer is not None and self._model is not None
 
             import torch as _torch
+
             torch_any: Any = _torch
 
             user_content = f"Ngữ cảnh tài liệu:\n{context}\n\nCâu hỏi: {query}"

@@ -208,7 +208,9 @@ def test_ollama_nlu_includes_previous_state_in_prompt_and_resolves_budget_scope(
         )
         return httpx.Response(
             status_code=200,
-            content=json.dumps({"message": {"role": "assistant", "content": response_content}}).encode("utf-8"),
+            content=json.dumps(
+                {"message": {"role": "assistant", "content": response_content}}
+            ).encode("utf-8"),
             request=request,
         )
 
@@ -291,5 +293,3 @@ def test_ollama_nlu_resets_scope_to_unknown_on_new_budget_with_unknown_scope() -
     merged = merge_state(prev_state, result.patch)
     assert merged.budget_amount == 900000
     assert merged.budget_scope == Scope.UNKNOWN
-
-
