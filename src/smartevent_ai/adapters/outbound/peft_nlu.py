@@ -65,10 +65,10 @@ class PeftTransformerNLU:
             if self._adapter_path is None or not self._adapter_path.exists():
                 raise FileNotFoundError(f"Adapter path not found: {self._adapter_path}")
 
-            import torch as _torch  # type: ignore[import-untyped]
+            import torch as _torch
 
             torch_any: Any = _torch
-            from peft import PeftModel  # type: ignore[import-not-found]
+            from peft import PeftModel
             from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
             tokenizer_source = str(self._adapter_path)

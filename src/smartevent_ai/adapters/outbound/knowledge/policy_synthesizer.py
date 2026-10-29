@@ -101,10 +101,10 @@ class PeftPolicySynthesizer:
             if self._adapter_path is None or not self._adapter_path.exists():
                 raise FileNotFoundError(f"RAG adapter path not found: {self._adapter_path}")
 
-        import torch as _torch  # type: ignore[import-untyped]
+        import torch as _torch
 
         torch_any: Any = _torch
-        from peft import PeftModel  # type: ignore[import-not-found]
+        from peft import PeftModel
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
         self._tokenizer = AutoTokenizer.from_pretrained(
