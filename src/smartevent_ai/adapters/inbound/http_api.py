@@ -99,6 +99,13 @@ class CitationDTO(BaseModel):
     end: int
 
 
+class ChatEventLinkDTO(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    event_id: UUID
+    title: str = Field(min_length=1, max_length=255)
+    slug: str = Field(min_length=1, max_length=255)
+
+
 class EventCardDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: UUID
@@ -140,6 +147,7 @@ class ChatResponseDTO(BaseModel):
     mode: str = "rule"
     status: str = "OK"
     citations: list[CitationDTO] = Field(default_factory=list)
+    event_links: list[ChatEventLinkDTO] = Field(default_factory=list)
 
     @classmethod
     def from_result(cls, result: ChatResult) -> "ChatResponseDTO":
@@ -155,6 +163,10 @@ class ChatResponseDTO(BaseModel):
             has_more=result.has_more,
             mode=result.mode,
             status=result.status,
+            event_links=[
+                ChatEventLinkDTO(event_id=UUID(e.event_id), title=e.title, slug=e.slug)
+                for e in result.event_links
+            ],
             citations=[
                 CitationDTO(
                     source_id=c.source_id,

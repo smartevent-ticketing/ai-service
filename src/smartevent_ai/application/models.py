@@ -18,6 +18,13 @@ class ChatCommand:
 
 
 @dataclass(frozen=True, slots=True)
+class ChatEventLink:
+    event_id: str
+    title: str
+    slug: str
+
+
+@dataclass(frozen=True, slots=True)
 class EventCard:
     id: UUID
     name: str
@@ -86,6 +93,7 @@ class ChatResult:
     citations: tuple[Citation, ...] = ()
     events: tuple[EventCard, ...] = ()
     actions: tuple[NavigationAction, ...] = ()
+    event_links: tuple[ChatEventLink, ...] = ()
     has_more: bool = False
     mode: str = "rule"
     status: str = "OK"

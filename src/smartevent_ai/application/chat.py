@@ -1,14 +1,31 @@
 """Chat orchestration use case with inward-facing dependencies only."""
 
 import asyncio
+from dataclasses import replace
 from uuid import UUID, uuid4
 
-from smartevent_ai.application.models import ChatCommand, ChatResult, EventCard, NavigationAction
+from smartevent_ai.application.models import (
+    ChatCommand,
+    ChatEventLink,
+    ChatResult,
+    EventCard,
+    NavigationAction,
+)
 from smartevent_ai.application.ports import BusinessReadTools, LanguageUnderstanding
 from smartevent_ai.application.knowledge_ports import PolicyReader
 from smartevent_ai.application.response_composer import ResponseComposer
-from smartevent_ai.domain.dialogue import DialogueState, Grounding, Intent, merge_state
-from smartevent_ai.domain.errors import ContractViolation, ToolUnavailable, ModelUnavailable
+from smartevent_ai.domain.dialogue import (
+    ClarificationReason,
+    DialogueState,
+    Grounding,
+    Intent,
+    merge_state,
+)
+from smartevent_ai.domain.errors import (
+    ContractViolation,
+    ToolUnavailable,
+    ModelUnavailable,
+)
 from smartevent_ai.domain.search import EventSearchCriteria
 
 
@@ -43,8 +60,7 @@ class ChatUseCase:
         except TimeoutError as exc:
             self.last_nlu_mode = "unavailable"
             raise ModelUnavailable("NLU deadline exceeded") from exc
-        from dataclasses import replace
-        from smartevent_ai.domain.dialogue import Understanding, Scope, ClarificationReason
+        from smartevent_ai.domain.dialogue import Understanding, Scope
 
         if not isinstance(understood, Understanding):
             raise ContractViolation("NLU returned invalid output")
@@ -64,7 +80,10 @@ class ChatUseCase:
                 )
         conversation_id = request.conversation_id or uuid4()
 
-        if understood.needs_clarification:
+        if (
+            understood.needs_clarification
+            and understood.clarification_reason is not ClarificationReason.BUDGET_SCOPE
+        ):
             return ChatResult(
                 conversation_id=conversation_id,
                 intent=understood.intent,
@@ -93,7 +112,12 @@ class ChatUseCase:
             )
 
         if (
-            understood.intent in (Intent.REFUND_POLICY, Intent.POLICY_FAQ, Intent.BOOKING_GUIDANCE)
+            understood.intent in (
+                Intent.REFUND_POLICY,
+                Intent.POLICY_FAQ,
+                Intent.BOOKING_GUIDANCE,
+                getattr(Intent, "PUBLIC_HELP", Intent.REFUND_POLICY),
+            )
             and self._policies is not None
         ):
             query = request.message
@@ -148,8 +172,8 @@ class ChatUseCase:
                 intent=intent,
                 state=state,
                 answer=(
-                    "Chưa thể xác minh danh sách sự kiện từ backend; "
-                    "chức năng đọc dữ liệu chưa được nghiệm thu."
+                    "Chưa thể xác minh danh sách sự kiện lúc này. "
+                    "Bạn vui lòng thử lại sau hoặc mở mục Sự kiện trên SmartEvent."
                 ),
                 grounding=Grounding.NO_LIVE_DATA,
                 status="TOOL_DISABLED",
@@ -175,4 +199,8 @@ class ChatUseCase:
             answer=self._composer.search_result(result),
             grounding=Grounding.BACKEND_READ,
             tool_called="search_events",
+            event_links=tuple(
+                ChatEventLink(event_id=row["id"], title=row["name"], slug=row["slug"])
+                for row in result["data"][:10]
+            ),
         )

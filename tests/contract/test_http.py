@@ -41,7 +41,8 @@ def test_second_turn_stateless_merge(client: TestClient) -> None:
 
 def test_budget_scope_followup_resolves_without_losing_state(client: TestClient) -> None:
     r1 = client.post("/api/v1/chat", json={"message": "3 vé dưới 800 nghìn"}).json()
-    assert "mỗi vé hay tổng" in r1["answer"]
+    assert "chưa lọc được" in r1["answer"]
+    assert "mỗi vé hay tổng" not in r1["answer"]
     r2 = client.post(
         "/api/v1/chat",
         json={

@@ -30,6 +30,10 @@ Dịch vụ được tổ chức theo **Clean Architecture**, tách xử lý h�
 
 Khi chưa có dữ liệu nghiệp vụ được xác minh, API trả `grounding: NO_LIVE_DATA` và giải thích giới hạn. Việc nhận diện được ý định tìm sự kiện không đồng nghĩa dịch vụ đã truy vấn backend.
 
+Để chạy thử tìm sự kiện công khai với backend trên máy và AI trong Docker, xem [hướng dẫn cấu hình local đã kiểm chứng](docs/architecture/LOCAL_PUBLIC_SEARCH.md). Cấu hình mặc định vẫn tắt mọi công cụ; cấu hình tìm sự kiện local chỉ bật `search_events` sau kiểm thử HTTP thật và đối chiếu database thử trước/sau. Các công cụ tài khoản vẫn tắt; RAG có cấu hình riêng được mô tả dưới đây.
+
+Bản local đã được gia cố thêm bằng [corpus hướng dẫn được chủ dự án duyệt](datasets/help_review_2026_10_30/README.md), tách câu hỏi hướng dẫn chung khỏi giao dịch cá nhân và truy xuất có citation. Xem [hiện trạng và cách vận hành](docs/architecture/CHATBOT_HARDENING_2026_10_30.md). Bộ này dùng BM25 trên artifact chỉ đọc; **không dùng pgvector**, không tải embedding/model trong chat và không mở quyền giao dịch hay dữ liệu tài khoản.
+
 ## Tech stack
 
 Các phiên bản dưới đây được lấy từ [`pyproject.toml`](pyproject.toml) và các lockfile của repository.
