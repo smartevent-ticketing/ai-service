@@ -2,7 +2,7 @@
   ".dockerignore": "3eb203cb157b02e4baeb61fee6f2b6ad4d5120a7b641d9b9fe4100cda7f8d6c6",
   ".env.example": "1dd04a7af464cb845aaf1ef9a29a25a22efc1f09b83f6d3574ceb17694888658",
   ".gitattributes": "4ab62ac4a0b6ee74530516fbdddae6677c35549cf307121cc139bef07e67c074",
-  ".github/workflows/ci.yml": "4406381d98efa543fa98274665e3f16dbd934acf33eb7ba4c186327d9ef7a451",
+  ".github/workflows/ci.yml": "fb73211b920a901b587f91d5357e9b02023b7ad261317341757b9dd1413abb64",
   ".gitignore": "7fac35e3a94382d3313f8691d9aa34af619f54a84f27fde29eaeaf59058ac2ce",
   ".python-version": "7b55f8e67b5623c4bef3fa691288da9437d79d3aba156de48d481db32ac7d16d",
   "AGENTS.md": "ab7bed49def275ba38dfdf27e45904659d1ee6e8bf1f7d6b3ecd2819fea48354",

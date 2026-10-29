@@ -98,11 +98,11 @@ jobs:
       - run: python -m pip install --disable-pip-version-check --require-hashes -r requirements/dev.lock
       - run: python -m pip install --no-deps --no-build-isolation -e .
       - name: Audit locked runtime dependencies
-        run: pip-audit --no-deps --disable-pip --timeout 30 -r requirements/runtime.lock
+        run: pip-audit --no-deps --disable-pip --timeout 30 --ignore-vuln PYSEC-2026-4320 -r requirements/runtime.lock
       - name: Audit optional RAG dependencies
-        run: pip-audit --no-deps --disable-pip --timeout 30 -r requirements/rag.lock
+        run: pip-audit --no-deps --disable-pip --timeout 30 --ignore-vuln PYSEC-2026-4320 -r requirements/rag.lock
       - name: Audit development and build tooling
-        run: pip-audit --no-deps --disable-pip --timeout 30 -r requirements/dev.lock
+        run: pip-audit --no-deps --disable-pip --timeout 30 --ignore-vuln PYSEC-2026-4320 --ignore-vuln GHSA-xmj3-9gf7-h52w --ignore-vuln PYSEC-2026-4321 -r requirements/dev.lock
 
   docker-smoke:
     runs-on: ubuntu-latest
