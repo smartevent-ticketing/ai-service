@@ -19,3 +19,7 @@ class BackendUnavailable(SmartEventError):
 
 class ModelUnavailable(SmartEventError):
     """NLU provider exceeded the request budget."""
+
+
+class KnowledgeUnavailable(SmartEventError):
+    """Knowledge reader is unavailable; distinct from business-data transport."""

@@ -4,7 +4,7 @@ import json
 from urllib.parse import urlsplit
 import httpx
 from smartevent_ai.domain.knowledge import Citation, PolicyAnswer
-from smartevent_ai.domain.errors import BackendUnavailable
+from smartevent_ai.domain.errors import KnowledgeUnavailable
 
 
 class HttpPolicyReader:
@@ -97,4 +97,4 @@ class HttpPolicyReader:
             return PolicyAnswer(data["answer"], tuple(citations), "remote_extractive")
         except (httpx.HTTPError, ValueError, TypeError, KeyError, RecursionError) as exc:
             self._status = "unavailable"
-            raise BackendUnavailable("Knowledge service unavailable") from exc
+            raise KnowledgeUnavailable("Knowledge service unavailable") from exc

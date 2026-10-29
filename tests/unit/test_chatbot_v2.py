@@ -243,3 +243,43 @@ def test_source_authority_changed_during_generation_discards_answer(tmp_path):
         store, BM25Retriever(), FrozenClock(NOW), synthesizer=Synthesizer()
     ).answer("Chính sách hoàn tiền")
     assert not result.citations
+
+
+@pytest.mark.parametrize(
+    "status,payload", [(503, b"{}"), (200, b"x" * 65537)], ids=["status_503", "oversized"]
+)
+def test_remote_reader_distinguishes_knowledge_failure_and_bounds_body(
+    monkeypatch, status, payload
+):
+    from smartevent_ai.adapters.outbound.knowledge import http_reader
+    from smartevent_ai.domain.errors import KnowledgeUnavailable
+
+    class Response:
+        status_code = status
+        headers = {"content-type": "application/json"}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def aiter_bytes(self):
+            yield payload
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def stream(self, method, path, **kwargs):
+            assert method == "GET" and path == "/v1/policy"
+            return Response()
+
+    monkeypatch.setattr(http_reader.httpx, "AsyncClient", lambda **kwargs: Client())
+    reader = http_reader.HttpPolicyReader("http://knowledge:8010", "TEST_ONLY_" * 4)
+    with pytest.raises(KnowledgeUnavailable):
+        _inline_run(reader.answer("thanh toán"))
+    assert reader.status() == "unavailable"

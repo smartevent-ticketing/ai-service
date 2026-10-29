@@ -20,6 +20,7 @@ from smartevent_ai.domain.errors import (
     ContractViolation,
     ToolUnavailable,
     ModelUnavailable,
+    KnowledgeUnavailable,
 )
 from smartevent_ai.infrastructure.settings import Settings
 
@@ -208,6 +209,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(SmartEventError)
     async def domain_error(request: Request, exc: SmartEventError) -> JSONResponse:
         # Do not expose internal backend content, secrets or contract details.
+        if isinstance(exc, KnowledgeUnavailable):
+            return JSONResponse(
+                status_code=503,
+                content={"code": "KNOWLEDGE_UNAVAILABLE", "message": "Knowledge unavailable"},
+            )
         if isinstance(exc, ModelUnavailable):
             return JSONResponse(
                 status_code=503,
