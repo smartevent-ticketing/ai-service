@@ -1,0 +1,19 @@
+services:
+  ai:
+    image: smartevent-ai-service:local-peft
+    build:
+      context: .
+      dockerfile: Dockerfile.peft
+    gpus: all
+    environment:
+      NLU_BACKEND: peft
+      NLU_CONTRACT: checkpoint_v1_2
+      NLU_ADAPTER_PATH: /models/unpacked_nlu_1.5b
+      NLU_BASE_MODEL: /base-nlu
+      NLU_LOAD_4BIT: "true"
+      HF_HOME: /model-cache/huggingface
+      TORCH_HOME: /model-cache/torch
+    volumes:
+      - ./models:/models:ro
+      - ./artifacts/original-nlu-base:/base-nlu:ro
+      - ${AI_MODEL_CACHE_DIR:-./artifacts/model-cache}:/model-cache

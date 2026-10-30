@@ -233,6 +233,7 @@ class ReadOnlyToolGateway:
         return {
             name: {
                 "available": name in self.available_names(),
+                "date_filters": name == "search_events" and name in self.available_names(),
                 "date_price_filters": name == "search_events"
                 and name in self.available_names()
                 and self._gate_pass("PUBLISHED-CHILD"),
@@ -256,7 +257,7 @@ class ReadOnlyToolGateway:
 
         if (
             name == "search_events"
-            and any(key in arguments for key in ("maxPrice", "startFrom", "startBefore"))
+            and "maxPrice" in arguments
             and not self._gate_pass("PUBLISHED-CHILD")
         ):
             raise ToolUnavailable("Price search requires child visibility evidence")

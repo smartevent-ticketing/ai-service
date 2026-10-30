@@ -258,6 +258,7 @@ def test_readiness_reports_blocked_filter_capability(approved_registry):
     gateway = ReadOnlyToolGateway(registry, gates_path, SpyTransport())
     assert gateway.capabilities()["search_events"] == {
         "available": True,
+        "date_filters": True,
         "date_price_filters": False,
     }
     gates = yaml.safe_load(gates_path.read_text())
@@ -265,6 +266,26 @@ def test_readiness_reports_blocked_filter_capability(approved_registry):
     gates_path.write_text(yaml.safe_dump(gates))
     gateway = ReadOnlyToolGateway(registry, gates_path, SpyTransport())
     assert gateway.capabilities()["search_events"]["date_price_filters"]
+
+
+@pytest.mark.asyncio
+async def test_date_only_search_does_not_require_price_visibility_gate(approved_registry):
+    registry, gates_path = approved_registry
+    transport = SpyTransport({
+        "success": True,
+        "data": {
+            "content": [], "page": 0, "size": 10, "totalElements": 0,
+            "totalPages": 0, "last": True,
+        },
+    })
+    gateway = ReadOnlyToolGateway(registry, gates_path, transport)
+    arguments = {"startFrom": "2026-10-31T17:00:00Z", "startBefore": "2026-11-30T17:00:00Z"}
+    result = await gateway.execute("search_events", arguments)
+    assert result["data"] == []
+    assert transport.calls[0][1] == arguments
+    with pytest.raises(ToolUnavailable):
+        await gateway.execute("search_events", {**arguments, "maxPrice": "500000"})
+    assert len(transport.calls) == 1
 
 
 def test_readiness_does_not_treat_last_request_as_model_probe():

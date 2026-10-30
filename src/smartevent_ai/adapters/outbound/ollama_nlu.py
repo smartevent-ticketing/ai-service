@@ -10,7 +10,10 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone, timedelta
 import threading
-from smartevent_ai.adapters.outbound.model_understanding import parse_model_understanding
+from smartevent_ai.adapters.outbound.model_understanding import (
+    MODEL_OUTPUT_SCHEMA,
+    parse_model_understanding,
+)
 import logging
 from typing import Any, Callable
 
@@ -58,6 +61,24 @@ class OllamaNLU:
 
     def close(self) -> None:
         self._client.close()
+
+    def _prepare_request(self, url: str, payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+        return url, payload
+
+    def _response_content(self, body: Any) -> str:
+        if (
+            not isinstance(body, dict)
+            or not isinstance(body.get("message"), dict)
+            or not isinstance(body["message"].get("content"), str)
+        ):
+            raise ValueError("Invalid model response envelope")
+        return body["message"]["content"]
+
+    def _understanding_payload(self, raw: str, text: str, state: DialogueState) -> dict[str, Any]:
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise ValueError("Model understanding must be an object")
+        return data
 
     def _normalize_city(self, city: str | None) -> str | None:
         if not city:
@@ -138,27 +159,24 @@ class OllamaNLU:
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": user_content},
                 ],
-                "format": "json",
+                "format": MODEL_OUTPUT_SCHEMA,
                 "stream": False,
+                "keep_alive": "30m",
                 "options": {
                     "temperature": 0.0,
-                    "num_predict": 512,
+                    "num_predict": 256,
+                    "num_ctx": 2048,
                 },
             }
+            url, payload = self._prepare_request(url, payload)
             req = self._client.build_request("POST", url, json=payload)
             response = self._client.send(req)
             response.raise_for_status()
 
             body = response.json()
-            if (
-                not isinstance(body, dict)
-                or not isinstance(body.get("message"), dict)
-                or not isinstance(body["message"].get("content"), str)
-            ):
-                raise ValueError("Invalid model response envelope")
-            raw_content = body.get("message", {}).get("content", "")
+            raw_content = self._response_content(body)
             clean_str = self._clean_json_str(raw_content)
-            data: dict[str, Any] = json.loads(clean_str)
+            data = self._understanding_payload(clean_str, text, state)
 
             if "giữ vé" in text.lower():
                 data["proposed_action"] = "EXPLAIN_WRITE_LIMITATION"

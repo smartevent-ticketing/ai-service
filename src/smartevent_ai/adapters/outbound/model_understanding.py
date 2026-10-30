@@ -15,6 +15,48 @@ from smartevent_ai.domain.dialogue import (
     merge_state,
 )
 
+# Constrain generation at the provider boundary as well as validating it after decoding.
+MODEL_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["primary_intent", "entities"],
+    "properties": {
+        "primary_intent": {"type": "string", "enum": [intent.value for intent in Intent]},
+        "proposed_action": {"type": "string"},
+        "entities": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "city": {"type": "string"},
+                "quantity": {"type": "integer", "minimum": 1, "maximum": 20},
+                "budget_amount": {"type": "integer", "minimum": 0, "maximum": 1000000000},
+                "budget_scope": {"type": "string", "enum": [scope.value for scope in Scope]},
+                "search_query": {"type": "string"},
+                "event_name": {"type": "string"},
+                "start_from": {"type": "string"},
+                "start_before": {"type": "string"},
+                "price_comparison": {"type": "string", "enum": ["LT", "LTE"]},
+                "faq_topic": {"type": "string"},
+            },
+        },
+        "state_delta": {
+            "type": "array",
+            "maxItems": 12,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["op"],
+                "properties": {
+                    "op": {"type": "string", "enum": ["SET", "REMOVE", "CLEAR"]},
+                    "slot": {"type": "string", "enum": [slot.value for slot in Slot]},
+                    "group": {"type": "string", "enum": [group.value for group in ClearGroup]},
+                    "value": {"type": ["string", "integer"]},
+                },
+            },
+        },
+    },
+}
+
 
 def parse_model_understanding(payload: dict[str, Any], state: DialogueState) -> Understanding:
     if not isinstance(payload, dict) or set(payload) - {

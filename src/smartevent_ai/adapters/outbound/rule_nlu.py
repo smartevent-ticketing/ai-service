@@ -529,6 +529,11 @@ class RuleBasedVietnameseNLU:
             return None
 
         candidate = match.group(1).strip()
+        # A recognized month is a date constraint, not a title keyword.
+        candidate = re.sub(
+            r"\b(?:(?:trong|vào)\s+)?tháng\s+(?:\d{1,2}(?:[ /-]\d{4})?|sau)\b",
+            " ", candidate,
+        )
         # Use the slot recognizer at any position; bare title numbers stay intact.
         candidate = " ".join(_QUANTITY.sub(" ", candidate).split())
         candidate = re.sub(r"^(?:sự kiện|su kien)\s+", "", candidate).strip()

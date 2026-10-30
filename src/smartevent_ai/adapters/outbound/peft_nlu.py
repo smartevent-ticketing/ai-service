@@ -10,6 +10,11 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone, timedelta
 from smartevent_ai.adapters.outbound.model_understanding import parse_model_understanding
+from smartevent_ai.adapters.outbound.legacy_checkpoint import (
+    TRAINING_PROMPT,
+    adapt_checkpoint,
+    folded,
+)
 import logging
 import threading
 from pathlib import Path
@@ -46,11 +51,13 @@ class PeftTransformerNLU:
         load_4bit: bool = True,
         generator: Callable[[str], str] | None = None,
         now: Callable[[], datetime] | None = None,
+        checkpoint_contract: bool = False,
     ) -> None:
         self._adapter_path = Path(adapter_path) if adapter_path is not None else None
         self._base_model_name = base_model_name
         self._load_4bit = load_4bit
         self._generator = generator
+        self._checkpoint_contract = checkpoint_contract
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._fallback_nlu = RuleBasedVietnameseNLU(self._now)
         self._inference_slots = threading.BoundedSemaphore(1)
@@ -87,7 +94,9 @@ class PeftTransformerNLU:
 
             try:
                 self._tokenizer = AutoTokenizer.from_pretrained(
-                    tokenizer_source, trust_remote_code=True
+                    tokenizer_source,
+                    trust_remote_code=False,
+                    **({"extra_special_tokens": {}} if self._checkpoint_contract else {}),
                 )
             except Exception as e:
                 if tokenizer_source != self._base_model_name:
@@ -166,12 +175,13 @@ class PeftTransformerNLU:
                 f"Tin nhắn người dùng: {user_text}"
             )
 
-        user_content = (
-            "Đồng hồ tham chiếu (UTC+07:00): "
-            + self._now().astimezone(timezone(timedelta(hours=7))).isoformat()
-            + "\n"
-            + user_content
-        )
+        if not self._checkpoint_contract:
+            user_content = (
+                "Đồng hồ tham chiếu (UTC+07:00): "
+                + self._now().astimezone(timezone(timedelta(hours=7))).isoformat()
+                + "\n"
+                + user_content
+            )
         if self._generator is not None:
             return self._generator(user_content)
 
@@ -183,7 +193,10 @@ class PeftTransformerNLU:
         torch_any: Any = _torch
 
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "system",
+                "content": TRAINING_PROMPT if self._checkpoint_contract else SYSTEM_PROMPT,
+            },
             {"role": "user", "content": user_content},
         ]
         prompt = self._tokenizer.apply_chat_template(
@@ -222,6 +235,20 @@ class PeftTransformerNLU:
     def parse(self, text: str, state: DialogueState) -> Understanding:
         from dataclasses import replace
 
+        if self._checkpoint_contract and state.active_intent in (
+            Intent.SEARCH_EVENT,
+            Intent.TICKET_RECOMMEND,
+        ):
+            rule = self._fallback_nlu.parse(text, state)
+            short = folded(text.strip())
+            if rule.intent is Intent.SEARCH_EVENT and (
+                rule.patch.removed_slots
+                or rule.patch.clear_group
+                or short in ("moi ve", "1 ve", "mot ve", "tong", "tong tat ca ve")
+                or (short.startswith(("doi sang ", "chuyen sang ")) and rule.patch.city)
+            ):
+                return replace(rule, mode="rule_followup")
+
         if not self._inference_slots.acquire(blocking=False):
             return replace(self._fallback_nlu.parse(text, state), mode="fallback")
         try:
@@ -233,7 +260,11 @@ class PeftTransformerNLU:
         try:
             raw_response = self._generate(text, state)
             clean_str = self._clean_json_str(raw_response)
-            payload: dict[str, Any] = json.loads(clean_str)
+            payload: dict[str, Any] = (
+                adapt_checkpoint(clean_str, text, state, self._fallback_nlu)
+                if self._checkpoint_contract
+                else json.loads(clean_str)
+            )
 
             if "giữ vé" in text.lower():
                 payload["proposed_action"] = "EXPLAIN_WRITE_LIMITATION"

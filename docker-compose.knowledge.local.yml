@@ -1,0 +1,22 @@
+services:
+  ai:
+    networks: [default, knowledge-api]
+
+  knowledge-db:
+    extends:
+      file: ../smartevent-infra/deploy/compose.knowledge.yml
+      service: knowledge-db
+
+  knowledge-reader:
+    extends:
+      file: ../smartevent-infra/deploy/compose.knowledge.yml
+      service: knowledge-reader
+
+networks:
+  knowledge-api:
+    internal: true
+  knowledge-data:
+    internal: true
+
+volumes:
+  knowledge-data:
