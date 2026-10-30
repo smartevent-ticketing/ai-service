@@ -143,3 +143,13 @@ python scripts/release/wheel_smoke.py dist
    tích hợp được duyệt; các gate mặc định vẫn đóng.
 
 Mốc A–E và 10 bước kế hoạch chung chưa được đóng bởi đợt sửa local này.
+
+## 6. Cập nhật đợt sửa liên repo
+
+Các sửa đổi source cho infra DDL/migration, backend giá/ghế/HTTP validation và
+web abort/contract đã được thực hiện trong working tree của ba repo tương ứng.
+AI giữ `degraded_bm25` từ reader và có test hồi quy cho trạng thái này.
+Chi tiết bằng chứng và giới hạn nằm ở repo infra:
+`docs/infra/CHATBOT_VERIFICATION_2026_10_30.md`.
+Các mục phụ thuộc ở trên chỉ được cập nhật về tiến độ source; chưa đóng các gate
+PostgreSQL, model thật, zero-write hoặc E2E toàn stack.

@@ -94,6 +94,9 @@ class HttpPolicyReader:
                 row["heading_path"] = tuple(row["heading_path"])
                 citations.append(Citation(**row))
             self._status = "last_read_ok"
+            if data.get("mode") == "degraded_bm25":
+                self._status = "last_read_degraded"
+                return PolicyAnswer(data["answer"], tuple(citations), "degraded_bm25")
             return PolicyAnswer(data["answer"], tuple(citations), "remote_extractive")
         except (httpx.HTTPError, ValueError, TypeError, KeyError, RecursionError) as exc:
             self._status = "unavailable"

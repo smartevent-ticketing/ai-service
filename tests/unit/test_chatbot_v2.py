@@ -284,3 +284,38 @@ def test_remote_reader_distinguishes_knowledge_failure_and_bounds_body(
     with pytest.raises(KnowledgeUnavailable):
         _inline_run(reader.answer("thanh toán"))
     assert reader.status() == "unavailable"
+
+
+def test_remote_reader_preserves_explicit_degraded_bm25_mode(monkeypatch):
+    import json
+    from smartevent_ai.adapters.outbound.knowledge import http_reader
+
+    class Response:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def aiter_bytes(self):
+            yield json.dumps(
+                {"answer": "No evidence", "citations": [], "mode": "degraded_bm25"}
+            ).encode()
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def stream(self, *args, **kwargs):
+            return Response()
+
+    monkeypatch.setattr(http_reader.httpx, "AsyncClient", lambda **kwargs: Client())
+    reader = http_reader.HttpPolicyReader("http://knowledge:8010", "TEST_ONLY_" * 4)
+    assert _inline_run(reader.answer("payment")).mode == "degraded_bm25"
+    assert reader.status() == "last_read_degraded"
