@@ -260,7 +260,7 @@
   "tests/unit/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "tests/unit/test_audit_orchestration.py": "d0aa657f4912bd59aecc9ae6de724d2dda90d645b8ff8d384312e1b8f0170eb1",
   "tests/unit/test_chat.py": "9ae5ad7daa99731b0917b44fdea32cb2a66e61148805ba0998a07d0ab18d9009",
-  "tests/unit/test_chatbot_v2.py": "ced136b0e9a9dde2f14b7c26082027cd268308f057c6a515a672ff531a14f5b6",
+  "tests/unit/test_chatbot_v2.py": "561829093af0ce2cdb97464787d7d961d02982148ceb12afe461763eaff04282",
   "tests/unit/test_domain.py": "2c3f5be58e94ea359285e94d9cbdf057815ca88fde1288c95b53a336e8931dcd",
   "tests/unit/test_nlu.py": "09fbc93da27ff9cb64fdcd4622d43fcc02765195f82b54610d5a193aa4aa88e2",
   "tests/unit/test_ollama_nlu.py": "c0dac40e05b1bb1e1cdcbfc09da62f88c461426d5e314c90333774d2fda3ddf0",
