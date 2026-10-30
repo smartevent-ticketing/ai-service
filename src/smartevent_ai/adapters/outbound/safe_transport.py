@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from smartevent_ai.adapters.outbound.route_policy import is_side_effect_route
-from smartevent_ai.domain.errors import BackendUnavailable, ContractViolation
+from smartevent_ai.domain.errors import BackendUnavailable, ContractViolation, UpstreamTimeout
 from smartevent_ai.domain.knowledge import MAX_JSON_DEPTH
 
 
@@ -89,9 +89,10 @@ class SafeBackendTransport:
             if not isinstance(data, dict):
                 raise BackendUnavailable("Backend envelope is not an object")
             return data
+        except (httpx.TimeoutException, TimeoutError) as exc:
+            raise UpstreamTimeout("Backend deadline exceeded") from exc
         except (
             httpx.HTTPError,
-            TimeoutError,
             UnicodeDecodeError,
             ValueError,
             RecursionError,

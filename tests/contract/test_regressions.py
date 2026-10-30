@@ -368,7 +368,7 @@ async def test_json_text_braces_are_not_structural_depth(monkeypatch: pytest.Mon
     )
 
 
-def test_http_malformed_upstream_uses_safe_fallback(
+def test_http_malformed_upstream_is_typed_dependency_error(
     approved_registry: tuple[Path, Path],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -390,5 +390,6 @@ def test_http_malformed_upstream_uses_safe_fallback(
     result = TestClient(create_app(Settings(config_dir=directory))).post(
         "/api/v1/chat", json={"message": "Tìm concert"}
     )
-    assert result.status_code == 200
-    assert result.json()["grounding"] == "NO_LIVE_DATA"
+    assert result.status_code == 503
+    assert result.json()["code"] == "BACKEND_UNAVAILABLE"
+    assert result.json()["retryable"] is True

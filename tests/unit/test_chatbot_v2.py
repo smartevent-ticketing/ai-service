@@ -13,6 +13,7 @@ from smartevent_ai.domain.dialogue import DialogueState, Intent, Scope, merge_st
 from smartevent_ai.domain.search import EventSearchCriteria
 from smartevent_ai.application.chat import ChatUseCase
 from smartevent_ai.application.models import ChatCommand, EventCard
+from smartevent_ai.domain.errors import ContractViolation
 
 NOW = datetime(2026, 10, 30, tzinfo=timezone.utc)
 
@@ -28,8 +29,8 @@ def test_acceptance_sequence_keeps_price_dates_city_and_resumes_search():
     assert second.intent is Intent.SEARCH_EVENT and not second.needs_clarification
     args = EventSearchCriteria.from_state(state).as_tool_arguments()
     assert args["maxPrice"] == "500000" and args["priceComparison"] == "LT"
-    assert args["startFrom"] == "2026-11-01T00:00:00+07:00"
-    assert args["startBefore"] == "2026-12-01T00:00:00+07:00"
+    assert args["startFrom"] == "2026-10-31T17:00:00Z"
+    assert args["startBefore"] == "2026-11-30T17:00:00Z"
     third = nlu.parse("Đổi sang Hà Nội", state)
     state = merge_state(state, third.patch)
     assert state.city == "Hà Nội" and state.budget_amount == 500000
@@ -106,9 +107,9 @@ def test_total_budget_uses_quantity_and_preserves_strict_comparison():
 def test_card_rejects_unsafe_slug_and_incomplete_price():
     row = {"id": str(uuid4()), "slug": "concert", "name": "Concert"}
     assert EventCard.from_projection(row).detail_path == "/events/concert"
-    with pytest.raises(ValueError):
+    with pytest.raises(ContractViolation):
         EventCard.from_projection({**row, "slug": "../admin"})
-    with pytest.raises(ValueError):
+    with pytest.raises(ContractViolation):
         EventCard.from_projection({**row, "price": 100000})
 
 

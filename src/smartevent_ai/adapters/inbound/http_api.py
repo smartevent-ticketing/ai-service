@@ -7,6 +7,7 @@ from datetime import datetime
 from dataclasses import asdict
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -21,6 +22,7 @@ from smartevent_ai.domain.errors import (
     ToolUnavailable,
     ModelUnavailable,
     KnowledgeUnavailable,
+    UpstreamTimeout,
 )
 from smartevent_ai.infrastructure.settings import Settings
 
@@ -193,6 +195,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.gateway = gateway
     app.add_middleware(RequestTelemetry)
 
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, exc: RequestValidationError) -> JSONResponse:
+        request.state.error_code = "INVALID_REQUEST"
+        return JSONResponse(
+            status_code=422,
+            content={
+                "code": "INVALID_REQUEST",
+                "message": "Invalid chat request",
+                "request_id": request.state.request_id,
+                "retryable": False,
+            },
+        )
+
     @app.get("/health/live")
     def live() -> dict[str, str]:
         return {"status": "alive"}
@@ -201,13 +216,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def ready() -> dict[str, object]:
         enabled = gateway.available_names()
         return {
-            "status": "ready"
-            if enabled
-            and (configuration.nlu_backend == "rule" or app.state.chat.last_nlu_mode == "model")
-            else "degraded",
+            "status": "ready" if enabled and configuration.nlu_backend == "rule" else "degraded",
             "business_tools_enabled": enabled,
             "model_backend": configuration.nlu_backend,
             "last_nlu_mode": app.state.chat.last_nlu_mode,
+            "nlu_availability": "available"
+            if configuration.nlu_backend == "rule"
+            else "unverified",
+            "business_tool_capabilities": gateway.capabilities(),
             "policy_retrieval": {
                 "status": app.state.chat.policy_status(),
                 "answer_mode": app.state.chat.policy_answer_mode(),
@@ -215,37 +231,44 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         }
 
     @app.post("/api/v1/chat", response_model=ChatResponseDTO)
-    async def post_chat(body: ChatRequestDTO) -> ChatResponseDTO:
-        return ChatResponseDTO.from_result(await app.state.chat.handle(body.to_command()))
+    async def post_chat(body: ChatRequestDTO, request: Request) -> ChatResponseDTO:
+        result = await app.state.chat.handle(body.to_command())
+        request.state.chat_outcome = {
+            "intent": result.intent.value,
+            "nlu_mode": result.mode,
+            "grounding": result.grounding.value,
+            "tool_name": result.tool_called,
+            "result_status": result.status,
+        }
+        return ChatResponseDTO.from_result(result)
 
     @app.exception_handler(SmartEventError)
     async def domain_error(request: Request, exc: SmartEventError) -> JSONResponse:
         # Do not expose internal backend content, secrets or contract details.
-        if isinstance(exc, KnowledgeUnavailable):
-            return JSONResponse(
-                status_code=503,
-                content={"code": "KNOWLEDGE_UNAVAILABLE", "message": "Knowledge unavailable"},
-            )
-        if isinstance(exc, ModelUnavailable):
-            return JSONResponse(
-                status_code=503,
-                content={"code": "MODEL_UNAVAILABLE", "message": "Model unavailable"},
-            )
+        errors = (
+            (UpstreamTimeout, 504, "UPSTREAM_TIMEOUT", True),
+            (KnowledgeUnavailable, 503, "KNOWLEDGE_UNAVAILABLE", True),
+            (ModelUnavailable, 503, "MODEL_UNAVAILABLE", True),
+            (BackendUnavailable, 503, "BACKEND_UNAVAILABLE", True),
+            (ContractViolation, 502, "UPSTREAM_CONTRACT_ERROR", False),
+            (ToolUnavailable, 503, "TOOL_DISABLED", False),
+        )
+        status, code, retryable = next(
+            (
+                (status, code, retryable)
+                for kind, status, code, retryable in errors
+                if isinstance(exc, kind)
+            ),
+            (422, "INVALID_REQUEST", False),
+        )
+        request.state.error_code = code
         return JSONResponse(
-            status_code=502
-            if isinstance(exc, (BackendUnavailable, ContractViolation))
-            else 503
-            if isinstance(exc, ToolUnavailable)
-            else 422,
+            status_code=status,
             content={
-                "code": "BACKEND_UNAVAILABLE"
-                if isinstance(exc, BackendUnavailable)
-                else "UPSTREAM_CONTRACT_ERROR"
-                if isinstance(exc, ContractViolation)
-                else "TOOL_DISABLED"
-                if isinstance(exc, ToolUnavailable)
-                else "INVALID_REQUEST",
+                "code": code,
                 "message": "Request could not be completed",
+                "request_id": request.state.request_id,
+                "retryable": retryable,
             },
         )
 

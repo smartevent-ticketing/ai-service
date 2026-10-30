@@ -20,12 +20,12 @@ from smartevent_ai.domain.dialogue import (
     Grounding,
     Intent,
     merge_state,
+    ClearGroup,
 )
 from smartevent_ai.domain.errors import (
-    BackendUnavailable,
     ContractViolation,
     ToolUnavailable,
-    ModelUnavailable,
+    UpstreamTimeout,
 )
 from smartevent_ai.domain.search import EventSearchCriteria
 
@@ -60,13 +60,31 @@ class ChatUseCase:
             )
         except TimeoutError as exc:
             self.last_nlu_mode = "unavailable"
-            raise ModelUnavailable("NLU deadline exceeded") from exc
+            raise UpstreamTimeout("NLU deadline exceeded") from exc
         from smartevent_ai.domain.dialogue import Understanding, Scope
 
         if not isinstance(understood, Understanding):
             raise ContractViolation("NLU returned invalid output")
         self.last_nlu_mode = understood.mode
+        public_intents = (
+            Intent.POLICY_FAQ,
+            Intent.PUBLIC_HELP,
+            Intent.REFUND_POLICY,
+            Intent.BOOKING_GUIDANCE,
+        )
+        if (
+            request.previous_state.active_intent in public_intents
+            and understood.intent is Intent.SEARCH_EVENT
+        ):
+            understood = replace(
+                understood, patch=replace(understood.patch, clear_group=ClearGroup.ALL_SLOTS)
+            )
         state = merge_state(request.previous_state, understood.patch)
+        if state.budget_amount is None and understood.clarification_reason in (
+            ClarificationReason.BUDGET_SCOPE,
+            ClarificationReason.QUANTITY_REQUIRED,
+        ):
+            understood = replace(understood, needs_clarification=False, clarification_reason=None)
         if understood.intent is Intent.SEARCH_EVENT and state.budget_amount is not None:
             reason = (
                 ClarificationReason.BUDGET_SCOPE
@@ -110,7 +128,8 @@ class ChatUseCase:
             )
 
         if (
-            understood.intent in (
+            understood.intent
+            in (
                 Intent.REFUND_POLICY,
                 Intent.POLICY_FAQ,
                 Intent.BOOKING_GUIDANCE,
@@ -119,7 +138,11 @@ class ChatUseCase:
             and self._policies is not None
         ):
             query = request.message
-            if request.previous_state.faq_topic and len(query) < 80:
+            if (
+                request.previous_state.active_intent in public_intents
+                and request.previous_state.faq_topic
+                and query.casefold().strip().startswith(("còn ", "con "))
+            ):
                 query = request.previous_state.faq_topic + ": " + query
             evidence = await self._policies.answer(query)
             if evidence.citations:
@@ -164,7 +187,7 @@ class ChatUseCase:
             # pure_operations (retrieve_policy, optimize_ticket_selection) and
             # ui_actions have no runtime caller; see test_unused_tools_locked.py.
             result = await self._tools.execute("search_events", criteria.as_tool_arguments())
-        except (ToolUnavailable, BackendUnavailable, ContractViolation):
+        except ToolUnavailable:
             return ChatResult(
                 conversation_id=conversation_id,
                 intent=intent,
@@ -176,10 +199,12 @@ class ChatUseCase:
                 grounding=Grounding.NO_LIVE_DATA,
                 status="TOOL_DISABLED",
             )
-        try:
-            events = tuple(EventCard.from_projection(row) for row in result.get("data", []))
-        except (ValueError, KeyError, TypeError) as exc:
-            raise ContractViolation("Invalid event card projection") from exc
+        if not isinstance(result, dict) or not isinstance(result.get("data"), list):
+            raise ContractViolation("Search projection must contain a data list")
+        for flag in ("has_more", "pagination_limited", "capped_by_adapter"):
+            if flag in result and type(result[flag]) is not bool:
+                raise ContractViolation("Invalid search pagination flag")
+        events = tuple(EventCard.from_projection(row) for row in result["data"])
         return ChatResult(
             conversation_id=conversation_id,
             intent=intent,
@@ -198,7 +223,6 @@ class ChatUseCase:
             grounding=Grounding.BACKEND_READ,
             tool_called="search_events",
             event_links=tuple(
-                ChatEventLink(event_id=row["id"], title=row["name"], slug=row["slug"])
-                for row in result["data"][:10]
+                ChatEventLink(event_id=str(e.id), title=e.name, slug=e.slug) for e in events[:10]
             ),
         )

@@ -228,6 +228,19 @@ class ReadOnlyToolGateway:
             )
         )
 
+    def capabilities(self) -> dict[str, dict[str, bool]]:
+        """Describe conditional gates without advertising blocked filters as available."""
+        return {
+            name: {
+                "available": name in self.available_names(),
+                "date_price_filters": name == "search_events"
+                and name in self.available_names()
+                and self._gate_pass("PUBLISHED-CHILD"),
+            }
+            for name in sorted(self.tools)
+            if self.tools[name]["access"] == "public"
+        }
+
     async def execute(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         tool = self.tools.get(name)
         if tool is None:

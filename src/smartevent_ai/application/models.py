@@ -2,12 +2,14 @@
 
 from dataclasses import dataclass
 from uuid import UUID
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from datetime import datetime
 import re
 from typing import Any
 
 from smartevent_ai.domain.dialogue import DialogueState, Grounding, Intent
 from smartevent_ai.domain.knowledge import Citation
+from smartevent_ai.domain.errors import ContractViolation
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,11 +45,40 @@ class EventCard:
 
     @classmethod
     def from_projection(cls, row: dict[str, Any]) -> "EventCard":
+        """Validate untrusted projected data before it reaches HTTP serialization."""
+        try:
+            return cls._from_projection(row)
+        except (ValueError, TypeError, KeyError, AttributeError, InvalidOperation) as exc:
+            raise ContractViolation("Invalid event card projection") from exc
+
+    @classmethod
+    def _from_projection(cls, row: dict[str, Any]) -> "EventCard":
+        if not isinstance(row, dict):
+            raise ValueError("event must be an object")
+        for key, maximum in (("name", 255), ("city", 80), ("venueName", 255)):
+            value = row.get(key)
+            if value is None and key != "name":
+                continue
+            if not isinstance(value, str) or not value.strip() or len(value) > maximum:
+                raise ValueError("invalid event text")
+        for key in ("startTime", "endTime", "priceObservedAt"):
+            value = row.get(key)
+            if value is not None:
+                if not isinstance(value, str):
+                    raise ValueError("event timestamps must be strings")
+                instant = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                if instant.tzinfo is None or instant.utcoffset() is None:
+                    raise ValueError("event timestamps require a timezone")
+        if row.get("startTime") and row.get("endTime"):
+            if datetime.fromisoformat(row["startTime"]) >= datetime.fromisoformat(row["endTime"]):
+                raise ValueError("event time range must be increasing")
         slug = row["slug"]
         if not isinstance(slug, str) or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]{0,254}", slug):
             raise ValueError("unsafe event slug")
         price = row.get("price")
         if price is not None:
+            if isinstance(price, bool) or not isinstance(price, (str, int, float, Decimal)):
+                raise ValueError("invalid price type")
             if row.get("currency") != "VND" or not all(
                 row.get(k) for k in ("ticketTypeId", "salePhaseId", "priceObservedAt", "priceBasis")
             ):
@@ -56,6 +87,8 @@ class EventCard:
             if not number.is_finite() or number < 0:
                 raise ValueError("invalid price")
             price = format(number, "f")
+            if row["priceBasis"] != "TICKET_FACE_VALUE":
+                raise ValueError("unsupported price basis")
         return cls(
             UUID(row["id"]),
             row["name"],

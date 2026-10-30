@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 import threading
 from smartevent_ai.adapters.outbound.model_understanding import parse_model_understanding
 import logging
-from typing import Any
+from typing import Any, Callable
 
 import httpx
 
@@ -46,12 +46,14 @@ class OllamaNLU:
         model: str = "smartevent-nlu:1.5b",
         timeout: float = 10.0,
         client: httpx.Client | None = None,
+        now: Callable[[], datetime] | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._timeout = timeout
         self._client = client or httpx.Client(timeout=timeout)
-        self._fallback_nlu = RuleBasedVietnameseNLU()
+        self._now = now or (lambda: datetime.now(timezone.utc))
+        self._fallback_nlu = RuleBasedVietnameseNLU(self._now)
         self._inference_slots = threading.BoundedSemaphore(2)
 
     def close(self) -> None:
@@ -94,6 +96,9 @@ class OllamaNLU:
                 or state.budget_amount is not None
                 or state.event_name
                 or state.search_query
+                or state.start_from
+                or state.start_before
+                or state.faq_topic
             ):
                 context_parts = []
                 if state.active_intent:
@@ -110,6 +115,12 @@ class OllamaNLU:
                     context_parts.append(f"event_name: {state.event_name}")
                 if state.search_query:
                     context_parts.append(f"search_query: {state.search_query}")
+                for key in ("start_from", "start_before", "price_comparison", "faq_topic"):
+                    value = getattr(state, key)
+                    if value is not None:
+                        context_parts.append(
+                            f"{key}: {value.isoformat() if isinstance(value, datetime) else value}"
+                        )
                 user_content = (
                     f"Trạng thái trước:\n{{{', '.join(context_parts)}}}\n\n"
                     f"Tin nhắn người dùng: {text}"
@@ -117,7 +128,7 @@ class OllamaNLU:
 
             user_content = (
                 "Đồng hồ tham chiếu (UTC+07:00): "
-                + datetime.now(timezone(timedelta(hours=7))).isoformat()
+                + self._now().astimezone(timezone(timedelta(hours=7))).isoformat()
                 + "\n"
                 + user_content
             )
@@ -162,7 +173,9 @@ class OllamaNLU:
                 mode="fallback",
             )
         except Exception as e:
-            logger.warning("OllamaNLU call failed (%s); falling back to RuleBasedNLU", e)
+            logger.warning(
+                "OllamaNLU call failed (%s); falling back to RuleBasedNLU", type(e).__name__
+            )
             from dataclasses import replace
 
             return replace(self._fallback_nlu.parse(text, state), mode="fallback")

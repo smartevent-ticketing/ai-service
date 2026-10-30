@@ -45,12 +45,14 @@ class PeftTransformerNLU:
         base_model_name: str = "Qwen/Qwen2.5-1.5B-Instruct",
         load_4bit: bool = True,
         generator: Callable[[str], str] | None = None,
+        now: Callable[[], datetime] | None = None,
     ) -> None:
         self._adapter_path = Path(adapter_path) if adapter_path is not None else None
         self._base_model_name = base_model_name
         self._load_4bit = load_4bit
         self._generator = generator
-        self._fallback_nlu = RuleBasedVietnameseNLU()
+        self._now = now or (lambda: datetime.now(timezone.utc))
+        self._fallback_nlu = RuleBasedVietnameseNLU(self._now)
         self._inference_slots = threading.BoundedSemaphore(1)
         self._model: Any = None
         self._tokenizer: Any = None
@@ -134,6 +136,9 @@ class PeftTransformerNLU:
             or state.budget_amount is not None
             or state.event_name
             or state.search_query
+            or state.start_from
+            or state.start_before
+            or state.faq_topic
         ):
             context_parts = []
             if state.active_intent:
@@ -150,6 +155,12 @@ class PeftTransformerNLU:
                 context_parts.append(f"event_name: {state.event_name}")
             if state.search_query:
                 context_parts.append(f"search_query: {state.search_query}")
+            for key in ("start_from", "start_before", "price_comparison", "faq_topic"):
+                value = getattr(state, key)
+                if value is not None:
+                    context_parts.append(
+                        f"{key}: {value.isoformat() if isinstance(value, datetime) else value}"
+                    )
             user_content = (
                 f"Trạng thái trước:\n{{{', '.join(context_parts)}}}\n\n"
                 f"Tin nhắn người dùng: {user_text}"
@@ -157,7 +168,7 @@ class PeftTransformerNLU:
 
         user_content = (
             "Đồng hồ tham chiếu (UTC+07:00): "
-            + datetime.now(timezone(timedelta(hours=7))).isoformat()
+            + self._now().astimezone(timezone(timedelta(hours=7))).isoformat()
             + "\n"
             + user_content
         )
@@ -239,7 +250,7 @@ class PeftTransformerNLU:
         except Exception as e:
             logger.warning(
                 "PeftTransformerNLU generation/parsing failed (%s); falling back to RuleBasedNLU",
-                e,
+                type(e).__name__,
             )
             from dataclasses import replace
 

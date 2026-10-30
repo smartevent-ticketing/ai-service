@@ -17,6 +17,10 @@ class BackendUnavailable(SmartEventError):
     """Backend response is untrusted, inaccessible or too large."""
 
 
+class UpstreamTimeout(BackendUnavailable):
+    """A dependency exceeded its request deadline."""
+
+
 class ModelUnavailable(SmartEventError):
     """NLU provider exceeded the request budget."""
 

@@ -32,7 +32,9 @@ async def test_screenshot_sequence_never_asks_unusable_budget_scope() -> None:
     chat = ChatUseCase(RuleBasedVietnameseNLU(), tools)
     state = DialogueState()
     # Turn 1: budget specified, scope unknown -> clarify
-    r1 = await chat.handle(ChatCommand(message="Tìm kiếm vé sự kiện dưới 500k trong tháng 11", previous_state=state))
+    r1 = await chat.handle(
+        ChatCommand(message="Tìm kiếm vé sự kiện dưới 500k trong tháng 11", previous_state=state)
+    )
     assert r1.status == "CLARIFY"
     assert "Ngân sách này tính" in r1.answer
     assert r1.state.budget_amount == 500_000

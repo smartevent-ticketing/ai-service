@@ -20,6 +20,7 @@ class RequestTelemetry:
             await self.app(scope, receive, send)
             return
         trace_id = str(uuid4())
+        scope.setdefault("state", {})["request_id"] = trace_id
         start = perf_counter()
         status = 500
 
@@ -45,6 +46,8 @@ class RequestTelemetry:
                         "route": path if path in _KNOWN_ROUTES else "unmatched",
                         "status": status,
                         "latency_ms": round((perf_counter() - start) * 1000, 3),
+                        "error_code": scope["state"].get("error_code"),
+                        **scope["state"].get("chat_outcome", {}),
                     },
                     sort_keys=True,
                 )

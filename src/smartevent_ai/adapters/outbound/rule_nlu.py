@@ -86,7 +86,7 @@ class RuleBasedVietnameseNLU:
                 patch = replace(
                     patch, removed_slots=patch.removed_slots | {Slot.START_FROM, Slot.START_BEFORE}
                 )
-            if result.intent is Intent.POLICY_FAQ:
+            if result.intent in (Intent.POLICY_FAQ, Intent.PUBLIC_HELP):
                 patch = replace(
                     patch,
                     faq_topic="thanh toán"
@@ -147,7 +147,9 @@ class RuleBasedVietnameseNLU:
         intent = self._classify_intent(norm)
         if (
             state.faq_topic
-            and norm.startswith(("còn ", "có "))
+            and state.active_intent in (Intent.POLICY_FAQ, Intent.PUBLIC_HELP)
+            and intent in (Intent.CLARIFY, Intent.PUBLIC_HELP, Intent.POLICY_FAQ)
+            and norm.startswith(("còn ", "con "))
             and not any(k in norm for k in ("sự kiện", "vé của tôi", "đơn hàng", "giao dịch"))
         ):
             intent = Intent.POLICY_FAQ
@@ -247,7 +249,7 @@ class RuleBasedVietnameseNLU:
             quantity=quantity,
             budget_amount=budget_amount,
             budget_scope=budget_scope,
-            price_comparison=("LT" if "dưới" in norm else "LTE")
+            price_comparison=("LT" if any(word in norm for word in ("dưới", "duoi")) else "LTE")
             if budget_amount is not None
             else None,
             search_query=search_query,
@@ -272,7 +274,7 @@ class RuleBasedVietnameseNLU:
     def _extract_city(norm: str) -> str | None:
         matches: list[tuple[int, str]] = []
         for marker, canonical in CITY_ALIASES:
-            for match in re.finditer(re.escape(marker), norm):
+            for match in re.finditer(r"(?<!\w)" + re.escape(marker) + r"(?!\w)", norm):
                 prefix = norm[max(0, match.start() - 40) : match.start()]
                 if not re.search(
                     r"(?:không (?:ở|chọn)|bỏ(?: bộ lọc)?(?: thành phố)?|ngoại trừ)\s*$", prefix
@@ -283,9 +285,37 @@ class RuleBasedVietnameseNLU:
     @staticmethod
     def _scope_from_text(norm: str) -> Scope:
         lowered = norm.lower()
-        if any(marker in lowered for marker in ("mỗi vé", "moi ve", "một vé", "mot ve", "1 vé", "1ve", "từng vé", "tung ve", "mỗi ghế", "moi ghe")):
+        if any(
+            marker in lowered
+            for marker in (
+                "mỗi vé",
+                "moi ve",
+                "một vé",
+                "mot ve",
+                "1 vé",
+                "1ve",
+                "từng vé",
+                "tung ve",
+                "mỗi ghế",
+                "moi ghe",
+            )
+        ):
             return Scope.PER_TICKET
-        if any(marker in lowered for marker in ("tổng", "tong", "tổng cộng", "tong cong", "cả nhóm", "ca nhom", "cả 3", "ca 3", "cả 2", "ca 2")):
+        if any(
+            marker in lowered
+            for marker in (
+                "tổng",
+                "tong",
+                "tổng cộng",
+                "tong cong",
+                "cả nhóm",
+                "ca nhom",
+                "cả 3",
+                "ca 3",
+                "cả 2",
+                "ca 2",
+            )
+        ):
             return Scope.TOTAL
         return Scope.UNKNOWN
 
@@ -344,7 +374,21 @@ class RuleBasedVietnameseNLU:
             return Intent.ORDER_STATUS
         if any(k in norm for k in ("vé của tôi", "ve cua toi", "vé của mình", "ve cua minh")):
             return Intent.MY_TICKETS
-        if any(k in norm for k in ("giữ vé", "giu ve", "hủy vé", "huy ve", "chuyển vé", "chuyen ve", "đặt hộ", "dat ho", "mua hộ", "mua ho")):
+        if any(
+            k in norm
+            for k in (
+                "giữ vé",
+                "giu ve",
+                "hủy vé",
+                "huy ve",
+                "chuyển vé",
+                "chuyen ve",
+                "đặt hộ",
+                "dat ho",
+                "mua hộ",
+                "mua ho",
+            )
+        ):
             return Intent.BOOKING_GUIDANCE
         help_request = any(
             k in norm

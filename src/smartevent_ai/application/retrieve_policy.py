@@ -63,12 +63,12 @@ class RetrievePolicy:
             verdicts = dict((c.chunk_id, v) for c, v in self._judge.judge(query, ranked))
         except Exception:
             verdicts = {}
-        # Judge unavailable (empty verdicts on non-empty ranked) falls back to
-        # plain BM25 ranking: every chunk treated as KEPT, never fail-closed.
+        # Missing verdicts never turn unchecked evidence into approved claims.
         kept = [
             c
             for c in ranked
-            if verdicts.get(c.chunk_id, EvidenceVerdict.KEPT) is not EvidenceVerdict.DROPPED
+            if verdicts.get(c.chunk_id, EvidenceVerdict.DROPPED)
+            in (EvidenceVerdict.KEPT, EvidenceVerdict.CONFLICTS)
         ]
         if not kept:
             return PolicyAnswer(NO_EVIDENCE)

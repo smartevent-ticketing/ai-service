@@ -1,6 +1,7 @@
 """One strict model-output boundary shared by Ollama and PEFT."""
 
 from datetime import datetime
+import re
 from typing import Any
 from smartevent_ai.domain.dialogue import (
     ClearGroup,
@@ -24,7 +25,7 @@ def parse_model_understanding(payload: dict[str, Any], state: DialogueState) -> 
     }:
         raise ValueError("unknown model output fields")
     intent = Intent(str(payload.get("primary_intent", "")).strip().upper())
-    entities = payload.get("entities") or {}
+    entities = payload.get("entities", {})
     if not isinstance(entities, dict):
         raise ValueError("entities must be an object")
     allowed = {s.value for s in Slot} | {"category", "ticket_type_name"}
@@ -43,7 +44,7 @@ def parse_model_understanding(payload: dict[str, Any], state: DialogueState) -> 
             values["search_query"] = query
     removed: set[Slot] = set()
     clear = None
-    delta = payload.get("state_delta") or []
+    delta = payload.get("state_delta", [])
     if not isinstance(delta, list) or len(delta) > 20:
         raise ValueError("invalid state_delta")
     for operation in delta:
@@ -56,7 +57,11 @@ def parse_model_understanding(payload: dict[str, Any], state: DialogueState) -> 
         }:
             raise ValueError("invalid state operation")
         op = str(operation.get("op", operation.get("operation", "SET"))).upper()
+        if "op" in operation and "operation" in operation:
+            raise ValueError("ambiguous operation aliases")
         if op == "CLEAR":
+            if clear is not None:
+                raise ValueError("multiple clear groups are ambiguous")
             clear = ClearGroup(operation.get("group", "ALL_SLOTS"))
         else:
             raw_slot = operation.get("slot")
@@ -67,7 +72,6 @@ def parse_model_understanding(payload: dict[str, Any], state: DialogueState) -> 
                 raise ValueError("state_delta cannot override routing")
             if op == "REMOVE":
                 removed.add(slot)
-                values.pop(slot.value, None)
             elif op == "SET" and operation.get("value") is not None:
                 values[slot.value] = operation["value"]
             else:
@@ -105,7 +109,11 @@ def parse_model_understanding(payload: dict[str, Any], state: DialogueState) -> 
         if not isinstance(values["city"], str):
             raise ValueError("city must be text")
         values["city"] = next(
-            (canonical for alias, canonical in CITY_ALIASES if alias in values["city"].casefold()),
+            (
+                canonical
+                for alias, canonical in CITY_ALIASES
+                if re.fullmatch(re.escape(alias), values["city"].strip().casefold())
+            ),
             values["city"],
         )
     if amount is not None and "budget_scope" not in values:
