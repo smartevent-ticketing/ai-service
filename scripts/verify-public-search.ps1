@@ -2,7 +2,9 @@ param(
     [string]$BackendRepo = (Join-Path $PSScriptRoot '../../smartevent-backend'),
     [string]$AiImage = 'smartevent-ai-service:local-public-search',
     [string]$BackendImage = 'smartevent-backend:local',
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot '../artifacts/local-public-search')
+    [string]$OutputDirectory = (Join-Path $PSScriptRoot '../artifacts/local-public-search'),
+    [string]$VerifierScript = 'scripts/public_search_deployment.py',
+    [string]$AdditionalFixture = ''
 )
 $ErrorActionPreference = 'Stop'
 $aiRepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -49,9 +51,13 @@ else:
     $null = Invoke-FixtureDocker run --rm --network $fixtureNetwork $AiImage python -c $readyCode "http://${fixtureBackend}:8080/api/v1/events?size=1"
     $null = Invoke-FixtureDocker cp (Join-Path $aiRepoRoot 'tests/fixtures/public_search.sql') "${fixtureDb}:/tmp/fixture.sql"
     $null = Invoke-FixtureDocker exec $fixtureDb psql -X -v ON_ERROR_STOP=1 -U fixture -d ai_search_test -f /tmp/fixture.sql
+    if ($AdditionalFixture) {
+        $null = Invoke-FixtureDocker cp (Join-Path $aiRepoRoot $AdditionalFixture) "${fixtureDb}:/tmp/price-fixture.sql"
+        $null = Invoke-FixtureDocker exec $fixtureDb psql -X -v ON_ERROR_STOP=1 -U fixture -d ai_search_test -f /tmp/price-fixture.sql
+    }
     $before = Get-FixtureSnapshot
     $reportPath = Join-Path $outputRoot 'live-evidence.json'
-    $null = Invoke-FixtureDocker run --rm --network $fixtureNetwork --mount "type=bind,source=$aiRepoRoot,target=/workspace,readonly" --mount "type=bind,source=$outputRoot,target=/evidence" --workdir /workspace -e PYTHONPATH=/workspace/src $AiImage python scripts/public_search_deployment.py verify --backend "http://${fixtureBackend}:8080" --report /evidence/live-evidence.json
+    $null = Invoke-FixtureDocker run --rm --network $fixtureNetwork --mount "type=bind,source=$aiRepoRoot,target=/workspace,readonly" --mount "type=bind,source=$outputRoot,target=/evidence" --workdir /workspace -e PYTHONPATH=/workspace/src $AiImage python $VerifierScript verify --backend "http://${fixtureBackend}:8080" --report /evidence/live-evidence.json
     $after = Get-FixtureSnapshot
     if ($before -cne $after) { throw 'Fixture database changed during read-only tests; deployment stays disabled.' }
     $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
@@ -63,7 +69,7 @@ else:
     }
     $report.note = 'Independent full-row fixture database digests match before/after live tests.'
     $report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $reportPath -Encoding utf8
-    $null = Invoke-FixtureDocker run --rm --mount "type=bind,source=$aiRepoRoot,target=/workspace,readonly" --mount "type=bind,source=$outputRoot,target=/evidence" --workdir /workspace -e PYTHONPATH=/workspace/src $AiImage python scripts/public_search_deployment.py prepare --report /evidence/live-evidence.json --output /evidence/configs
+    $null = Invoke-FixtureDocker run --rm --mount "type=bind,source=$aiRepoRoot,target=/workspace,readonly" --mount "type=bind,source=$outputRoot,target=/evidence" --workdir /workspace -e PYTHONPATH=/workspace/src $AiImage python $VerifierScript prepare --report /evidence/live-evidence.json --output /evidence/configs
     Write-Output "Verified local public-search config: $(Join-Path $outputRoot 'configs')"
 } finally {
     & docker rm -f $fixtureBackend $fixtureDb 2>$null | Out-Null

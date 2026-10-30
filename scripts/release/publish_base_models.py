@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
@@ -19,6 +20,15 @@ MARKER = "SmartEvent pinned Qwen base-model mirror"
 PART_BYTES = 1_500_000_000  # Less than GitHub's 2 GiB per-asset limit.
 BLOCK = 8 * 1024 * 1024
 ALLOWED_MODELS = {"nlu": "Qwen/Qwen2.5-1.5B-Instruct", "rag": "Qwen/Qwen2.5-3B-Instruct"}
+PUBLICATION_BRANCH = "publish/base-models-qwen25-20261030"
+PUBLICATION_FILES = (
+    "scripts/release/publish_base_models.py",
+    "scripts/release/download_base_models.py",
+    "models/base-models-source.json",
+    ".github/workflows/publish-base-models.yml",
+    "docs/architecture/BASE_MODEL_DISTRIBUTION.md",
+    "tests/release/test_base_model_release.py",
+)
 
 
 def digest(path: Path) -> str:
@@ -29,7 +39,7 @@ def digest(path: Path) -> str:
 def safe_name(name: str) -> str:
     if (
         not isinstance(name, str)
-        or not re.fullmatch(r"[A-Za-z0-9_.-]+", name)
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", name)
         or name in (".", "..")
     ):
         raise ValueError("Unsafe model/asset filename")
@@ -91,6 +101,61 @@ def gh(*arguments: str, allow_not_found: bool = False):
 def api(path: str, allow_not_found: bool = False):
     response = gh("api", path, allow_not_found=allow_not_found)
     return None if response is None else json.loads(response)
+
+
+def post_api(path: str, body: dict) -> dict:
+    result = subprocess.run(  # noqa: S603,S607 -- fixed GitHub CLI, no shell
+        ["gh", "api", "--method", "POST", path, "--input", "-"],  # noqa: S607
+        input=json.dumps(body),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode:
+        raise RuntimeError("GitHub write failed: " + result.stderr[-1500:])
+    return json.loads(result.stdout)
+
+
+def start_workflow(root: Path) -> str:
+    """Publish only mirror tooling on a new branch; do not touch local Git state."""
+    prefix = f"repos/{REPOSITORY}"
+    existing = api(f"{prefix}/git/ref/heads/{PUBLICATION_BRANCH}", allow_not_found=True)
+    if existing:
+        raise ValueError(
+            "Publication branch already exists; open Actions and rerun its publication job"
+        )
+    main = api(f"{prefix}/git/ref/heads/main")["object"]["sha"]
+    base_tree = api(f"{prefix}/git/commits/{main}")["tree"]["sha"]
+    remote_manifest = api(f"{prefix}/contents/MANIFEST_SHA256.json?ref={main}")
+    manifest = json.loads(base64.b64decode(remote_manifest["content"]))
+    validate_source(json.loads((root / "models/base-models-source.json").read_text("utf-8")))
+    entries = []
+    for path in PUBLICATION_FILES:
+        content = (root / path).read_text("utf-8")
+        entries.append({"path": path, "mode": "100644", "type": "blob", "content": content})
+        if not path.startswith("models/"):
+            manifest[path] = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    entries.append(
+        {
+            "path": "MANIFEST_SHA256.json",
+            "mode": "100644",
+            "type": "blob",
+            "content": json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        }
+    )
+    tree = post_api(f"{prefix}/git/trees", {"base_tree": base_tree, "tree": entries})
+    commit = post_api(
+        f"{prefix}/git/commits",
+        {
+            "message": "Thêm quy trình phát hành hai mô hình nền Qwen có kiểm tra toàn vẹn",
+            "tree": tree["sha"],
+            "parents": [main],
+        },
+    )
+    post_api(
+        f"{prefix}/git/refs", {"ref": "refs/heads/" + PUBLICATION_BRANCH, "sha": commit["sha"]}
+    )
+    return f"https://github.com/{REPOSITORY}/actions?query=branch%3A{PUBLICATION_BRANCH}"
 
 
 def fetch_source(model: dict, file: dict, destination: Path) -> None:
@@ -237,8 +302,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--source-manifest", type=Path, default=Path("models/base-models-source.json")
     )
-    parser.add_argument("--workdir", type=Path, required=True)
+    parser.add_argument("--workdir", type=Path)
+    parser.add_argument(
+        "--start-workflow",
+        action="store_true",
+        help="Use your gh login to start server-side publication",
+    )
     parser.add_argument("--tag", default=TAG)
     parser.add_argument("--target", default=os.environ.get("GITHUB_SHA", "main"))
     args = parser.parse_args()
-    print(publish(args.source_manifest, args.workdir, args.tag, args.target), flush=True)
+    if args.start_workflow:
+        print(start_workflow(Path(__file__).resolve().parents[2]), flush=True)
+    elif args.workdir is None:
+        parser.error("--workdir is required unless --start-workflow is selected")
+    else:
+        print(publish(args.source_manifest, args.workdir, args.tag, args.target), flush=True)

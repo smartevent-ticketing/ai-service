@@ -36,6 +36,7 @@ PROOFS = (
     "price_lt_lte_and_inactive_child_test",
     "search_child_area_and_inventory_membership_test",
     "search_budget_to_event_cards_test",
+    "date_filter_boundaries_test",
 )
 
 
@@ -180,6 +181,26 @@ async def verify(base_url: str, report_path: Path) -> None:
                 row["slug"] for row in city["data"]
             }
             await verify_filters(gateway)
+            # Exact fixture boundaries prove filtering occurs before pagination.
+            first, second = result["data"][:2]
+            date_args = {"startFrom": first["startTime"], "startBefore": second["startTime"]}
+            dated = await gateway.execute("search_events", date_args)
+            assert [row["id"] for row in dated["data"]] == [first["id"]]
+            assert dated["result_complete"]
+            excluded = await gateway.execute("search_events", {"q": "AI_GATE_HIDDEN", **date_args})
+            assert excluded["data"] == []
+            month = datetime.fromisoformat(first["startTime"].replace("Z", "+00:00"))
+            monthly = await ChatUseCase(RuleBasedVietnameseNLU(), gateway).handle(
+                ChatCommand(message=f"Tìm sự kiện tháng {month.month}/{month.year}")
+            )
+            assert monthly.tool_called == "search_events" and monthly.events
+            assert monthly.state.start_from is not None and monthly.state.start_before is not None
+            assert all(
+                monthly.state.start_from
+                <= datetime.fromisoformat(e.start_time.replace("Z", "+00:00"))
+                < monthly.state.start_before
+                for e in monthly.events
+            )
             before = len(calls)
             for name in [n for n in gateway.tools if n != "search_events"] + ["create_order"]:
                 try:

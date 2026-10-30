@@ -10,6 +10,18 @@ services:
     environment:
       BACKEND_BASE_URL: http://host.docker.internal:8080
       CONFIG_DIR: /app/configs
+      NLU_BACKEND: ${NLU_BACKEND:-rule}
+      NLU_CONTRACT: ${NLU_CONTRACT:-runtime}
+      RAG_BACKEND: ${RAG_BACKEND:-extractive}
+      POLICY_BACKEND: ${POLICY_BACKEND:-artifact}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_NLU_MODEL: ${OLLAMA_NLU_MODEL:-smartevent-nlu:1.5b}
+      OLLAMA_RAG_MODEL: ${OLLAMA_RAG_MODEL:-smartevent-rag:3b}
+      OLLAMA_TIMEOUT_SECONDS: ${OLLAMA_TIMEOUT_SECONDS:-10}
+      LLAMA_NLU_BASE_URL: ${LLAMA_NLU_BASE_URL:-http://llama-nlu:8080}
+      LLAMA_RAG_BASE_URL: ${LLAMA_RAG_BASE_URL:-http://llama-rag:8080}
+      KNOWLEDGE_BASE_URL: ${KNOWLEDGE_BASE_URL:-http://knowledge-reader:8010}
+      KNOWLEDGE_SERVICE_TOKEN: ${KNOWLEDGE_SERVICE_TOKEN:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

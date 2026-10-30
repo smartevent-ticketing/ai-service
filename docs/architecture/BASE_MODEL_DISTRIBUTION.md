@@ -50,6 +50,26 @@ Sau khi đã có launcher demo và môi trường PEFT/CUDA tương ứng:
 Vẫn cần giải nén adapter và chuẩn bị corpus theo tài liệu demo. Bản phát hành
 model nền không thay thế các bước cài thư viện, kiểm thử và cấu hình ứng dụng.
 
+## Khởi chạy phát hành bằng tài khoản GitHub của bạn
+
+Nếu kết nối GitHub của ChatGPT không có quyền ghi, dùng PowerShell thông thường
+tại `ai-service`:
+
+```powershell
+gh auth login --hostname github.com --scopes workflow
+.\.venv\Scripts\python.exe scripts/release/publish_base_models.py --start-workflow
+```
+
+Tài khoản phải có quyền ghi vào `smartevent-ticketing/ai-service` và quyền cập
+nhật workflow. Lệnh thứ hai tạo nhánh `publish/base-models-qwen25-20261030` từ
+`main` trên GitHub và chỉ thêm sáu file phục vụ xuất model cùng manifest nguồn.
+Nó không commit, checkout hay đẩy các thay đổi ứng dụng đang làm dở trên máy.
+Push nhánh sẽ khởi chạy workflow tải và xuất model bằng GitHub Actions.
+
+Lệnh in link Actions để theo dõi. Chỉ khi job thành công và release đã công khai
+mới có thể tải model từ trang Releases. Nếu nhánh đã tồn tại, vào Actions để
+chạy lại job thay vì ghi đè nhánh hoặc asset khác.
+
 ## Tính toàn vẹn và phát hành
 
 `models/base-models-source.json` khóa phiên bản, kích thước và SHA-256 của đúng

@@ -97,8 +97,8 @@ def restore_file(record: dict, destination: Path, assets_dir: Path | None = None
                 stream = (
                     (assets_dir / part["name"]).open("rb")
                     if assets_dir
-                    else urlopen(part["url"], timeout=180)
-                )  # noqa: S310 -- manifest validated against the fixed GitHub release
+                    else urlopen(part["url"], timeout=180)  # noqa: S310 -- validated fixed release
+                )
                 checksum = hashlib.sha256()
                 length = 0
                 with stream:

@@ -130,3 +130,45 @@ class GateControlledPolicyReader:
             return PolicyAnswer(NO_EVIDENCE)
         answer = await self._reader.answer(query)
         return answer if self._approved() else PolicyAnswer(NO_EVIDENCE)
+
+
+class VerifiedSynthesizingPolicyReader:
+    """Connect remote evidence to generation without weakening source verification.
+
+    Paraphrase acceptance remains blocked pending an evaluated entailment checker.
+    Remote evidence is fetched again after generation to enforce revocation/expiry.
+    """
+
+    answer_mode = "verified_remote_extractive"
+
+    def __init__(self, reader: PolicyReader, synthesizer: PolicySynthesizer) -> None:
+        self._reader, self._synthesizer = reader, synthesizer
+
+    def status(self) -> str:
+        return self._reader.status()
+
+    async def answer(self, query: str) -> PolicyAnswer:
+        evidence = await self._reader.answer(query)
+        if not evidence.citations:
+            return evidence
+        try:
+            candidate = await asyncio.wait_for(
+                asyncio.to_thread(self._synthesizer.synthesize, query, evidence.answer),
+                timeout=15.0,
+            )
+        except Exception:
+            candidate = None
+        fresh = await self._reader.answer(query)
+        if (
+            not fresh.citations
+            or fresh.answer != evidence.answer
+            or fresh.citations != evidence.citations
+        ):
+            return fresh
+        if fresh.mode == "degraded_bm25":
+            return fresh
+        if isinstance(candidate, str) and " ".join(candidate.split()) == " ".join(
+            fresh.answer.split()
+        ):
+            return PolicyAnswer(candidate.strip(), fresh.citations, "verified_extractive")
+        return PolicyAnswer(fresh.answer, fresh.citations, "extractive_fallback")

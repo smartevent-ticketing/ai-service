@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     backend_base_url: str = "http://127.0.0.1:8080"
     config_dir: Path | None = Field(default=None)
 
-    nlu_backend: Literal["rule", "ollama", "peft"] = "rule"
+    nlu_backend: Literal["rule", "ollama", "peft", "llama_cpp"] = "rule"
+    nlu_contract: Literal["runtime", "checkpoint_v1_2"] = "runtime"
     nlu_adapter_path: Path | None = Field(default=None)
     nlu_base_model: str = "Qwen/Qwen2.5-1.5B-Instruct"
     nlu_load_4bit: bool = True
@@ -38,11 +39,13 @@ class Settings(BaseSettings):
     ollama_nlu_model: str = "smartevent-nlu:1.5b"
     ollama_rag_model: str = "smartevent-rag:3b"
     ollama_timeout_seconds: float = 10.0
+    llama_nlu_base_url: str = "http://127.0.0.1:11435"
+    llama_rag_base_url: str = "http://127.0.0.1:11436"
 
     policy_backend: Literal["artifact", "http"] = "artifact"
     knowledge_base_url: str = "http://127.0.0.1:8010"
     knowledge_service_token: SecretStr = SecretStr("")
-    rag_backend: Literal["extractive", "ollama", "peft"] = "extractive"
+    rag_backend: Literal["extractive", "ollama", "peft", "llama_cpp"] = "extractive"
     rag_adapter_path: Path | None = Field(default=None)
     rag_base_model: str = "Qwen/Qwen2.5-3B-Instruct"
     rag_load_4bit: bool = True

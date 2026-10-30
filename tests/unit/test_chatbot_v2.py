@@ -20,6 +20,22 @@ from fastapi.testclient import TestClient
 NOW = datetime(2026, 10, 30, tzinfo=timezone.utc)
 
 
+@pytest.mark.parametrize(
+    "message,keyword",
+    [
+        ("Tìm sự kiện tháng 11/2026", None),
+        ("Tìm sự kiện trong tháng 11", None),
+        ("Tìm concert vào tháng 11-2026", "concert"),
+        ("Tìm sự kiện tháng sau", None),
+        ("Tìm show 2026 trong tháng 11", "show 2026"),
+    ],
+)
+def test_month_filter_is_not_sent_as_a_title_keyword(message, keyword):
+    result = RuleBasedVietnameseNLU(lambda: NOW).parse(message, DialogueState())
+    assert result.patch.start_from is not None
+    assert result.patch.search_query == keyword
+
+
 def test_acceptance_sequence_keeps_price_dates_city_and_resumes_search():
     nlu = RuleBasedVietnameseNLU(lambda: NOW)
     first = nlu.parse("Tìm sự kiện ở TP.HCM dưới 500k trong tháng 11", DialogueState())
@@ -475,5 +491,8 @@ def test_ready_probe_with_model_backend_not_permanently_degraded():
 
     with TestClient(app) as client:
         ready = client.get("/health/ready").json()
-        assert ready["status"] == "ready"
+        assert ready["status"] == "degraded"
+        assert ready["nlu_availability"] == "unverified"
         assert ready["model_backend"] == "ollama"
+        app.state.chat.last_nlu_mode = "model"
+        assert client.get("/health/ready").json()["status"] == "ready"

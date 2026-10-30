@@ -5,6 +5,11 @@ from smartevent_ai.adapters.outbound.knowledge.policy_synthesizer import (
     PeftPolicySynthesizer,
 )
 from smartevent_ai.adapters.outbound.ollama_nlu import OllamaNLU
+from smartevent_ai.adapters.outbound.llama_cpp import (
+    LlamaCppNLU,
+    LlamaCppPolicySynthesizer,
+    OllamaCheckpointNLU,
+)
 from smartevent_ai.adapters.outbound.peft_nlu import PeftTransformerNLU
 from smartevent_ai.adapters.outbound.read_only_gateway import ReadOnlyToolGateway
 from smartevent_ai.adapters.outbound.rule_nlu import RuleBasedVietnameseNLU
@@ -19,6 +24,7 @@ from smartevent_ai.infrastructure.knowledge_config import ReviewedRagConfig
 from smartevent_ai.infrastructure.knowledge_runtime import (
     RuntimePolicyReader,
     GateControlledPolicyReader,
+    VerifiedSynthesizingPolicyReader,
 )
 
 
@@ -28,7 +34,13 @@ def build_chat(settings: Settings) -> tuple[ChatUseCase, ReadOnlyToolGateway]:
     pool = SequentialPeftPool() if settings.peft_sequential else None
 
     synthesizer: PolicySynthesizer | None = None
-    if settings.rag_backend == "ollama":
+    if settings.rag_backend == "llama_cpp":
+        synthesizer = LlamaCppPolicySynthesizer(
+            base_url=settings.llama_rag_base_url,
+            model=settings.ollama_rag_model,
+            timeout=settings.ollama_timeout_seconds,
+        )
+    elif settings.rag_backend == "ollama":
         synthesizer = OllamaPolicySynthesizer(
             base_url=settings.ollama_base_url,
             model=settings.ollama_rag_model,
@@ -56,9 +68,25 @@ def build_chat(settings: Settings) -> tuple[ChatUseCase, ReadOnlyToolGateway]:
             ),
             settings.gates_path,
         )
+        if synthesizer is not None:
+            policies = VerifiedSynthesizingPolicyReader(policies, synthesizer)
 
     nlu: LanguageUnderstanding
-    if settings.nlu_backend == "ollama":
+    if settings.nlu_backend == "llama_cpp":
+        nlu = LlamaCppNLU(
+            checkpoint_contract=settings.nlu_contract == "checkpoint_v1_2",
+            base_url=settings.llama_nlu_base_url,
+            model=settings.ollama_nlu_model,
+            timeout=settings.ollama_timeout_seconds,
+        )
+    elif settings.nlu_backend == "ollama" and settings.nlu_contract == "checkpoint_v1_2":
+        nlu = OllamaCheckpointNLU(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_nlu_model,
+            timeout=settings.ollama_timeout_seconds,
+            checkpoint_contract=True,
+        )
+    elif settings.nlu_backend == "ollama":
         nlu = OllamaNLU(
             base_url=settings.ollama_base_url,
             model=settings.ollama_nlu_model,
@@ -66,6 +94,7 @@ def build_chat(settings: Settings) -> tuple[ChatUseCase, ReadOnlyToolGateway]:
         )
     elif settings.nlu_backend == "peft":
         nlu = PeftTransformerNLU(
+            checkpoint_contract=settings.nlu_contract == "checkpoint_v1_2",
             adapter_path=settings.nlu_adapter_path,
             base_model_name=settings.nlu_base_model,
             load_4bit=settings.nlu_load_4bit,

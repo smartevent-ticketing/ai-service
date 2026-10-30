@@ -108,6 +108,11 @@ def test_query_with_ve_retains_evidence() -> None:
     assert classify("Chính sách về vé", chunk) is EvidenceVerdict.KEPT
 
 
+def test_question_filler_normalization_keeps_card_as_a_content_word() -> None:
+    chunk = _chunk("Thẻ ngân hàng có thể được dùng qua cổng VNPay.", context="Thanh toán")
+    assert classify("thẻ", chunk) is EvidenceVerdict.KEPT
+
+
 def test_decomposed_ve_normalization_avoids_confusion_with_ticket() -> None:
     import unicodedata
 

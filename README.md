@@ -142,6 +142,8 @@ python scripts/verify/verify_dependency_locks.py
 
 ### 3. Thiết lập Mô hình AI (GGUF / Ollama hoặc PEFT)
 
+**Lưu trữ local:** giữ model và cache trong checkout trên ổ D; xem [cấu hình lưu trữ](docs/architecture/LOCAL_STORAGE.md) trước khi cài thêm. Các bước model dưới đây không phải xác nhận checkpoint đã chạy thành công. Docker image/cache có vị trí lưu riêng và có thể vẫn chiếm ổ C.
+
 Repository đã đính kèm sẵn 2 bộ trọng số LoRA finetuned trong thư mục `models/`:
 - `models/smartevent-nlu-qwen1.5b-final.zip` (29.8 MB) — NLU bóc tách intent, slots, proposed action.
 - `models/smartevent-rag-qwen3b-final.zip` (46.1 MB) — RAG giải đáp chính sách SmartEvent.

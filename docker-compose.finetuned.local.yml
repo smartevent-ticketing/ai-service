@@ -1,0 +1,40 @@
+services:
+  llama-nlu:
+    image: ollama/ollama@sha256:b2f0122c476bc9fe7ce679d8bb4bd555351e25e2554eefb156f61cb0a89cf429
+    entrypoint: /usr/lib/ollama/llama-server
+    command: ["--model", "${NLU_BASE_GGUF:?Set NLU_BASE_GGUF}", "--lora", "/adapters/smartevent-nlu-lora.gguf", "--alias", "smartevent-nlu:1.5b", "--ctx-size", "2048", "--parallel", "1", "--gpu-layers", "99", "--threads", "4", "--port", "8080", "--host", "0.0.0.0", "--no-warmup"]
+    gpus: all
+    environment:
+      GGML_BACKEND_PATH: /usr/lib/ollama/cuda_v12/libggml-cuda.so
+      LD_LIBRARY_PATH: /usr/lib/ollama/cuda_v12:/usr/lib/ollama
+    restart: unless-stopped
+    ports: ["127.0.0.1:11435:8080"]
+    volumes:
+      - ${AI_OLLAMA_HOME:-./artifacts/ollama-home}:/root/.ollama:ro
+      - ./models:/adapters:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 6
+      start_period: 90s
+
+  llama-rag:
+    image: ollama/ollama@sha256:b2f0122c476bc9fe7ce679d8bb4bd555351e25e2554eefb156f61cb0a89cf429
+    entrypoint: /usr/lib/ollama/llama-server
+    command: ["--model", "${RAG_BASE_GGUF:?Set RAG_BASE_GGUF}", "--lora", "/adapters/smartevent-rag-lora.gguf", "--alias", "smartevent-rag:3b", "--ctx-size", "2048", "--parallel", "1", "--gpu-layers", "12", "--threads", "8", "--port", "8080", "--host", "0.0.0.0", "--no-warmup"]
+    gpus: all
+    environment:
+      GGML_BACKEND_PATH: /usr/lib/ollama/cuda_v12/libggml-cuda.so
+      LD_LIBRARY_PATH: /usr/lib/ollama/cuda_v12:/usr/lib/ollama
+    restart: unless-stopped
+    ports: ["127.0.0.1:11436:8080"]
+    volumes:
+      - ${AI_OLLAMA_HOME:-./artifacts/ollama-home}:/root/.ollama:ro
+      - ./models:/adapters:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 6
+      start_period: 90s

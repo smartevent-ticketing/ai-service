@@ -24,7 +24,8 @@ _INJECTION = re.compile(
 
 _STOP = frozenset(
     "toi muon hoi la gi cai nay kia va hoac cua trong voi cho co khong nao a nhe "
-    "xin biet duoc deu".split()
+    "xin biet duoc deu lam de cach nhu nhung vay minh ban em chi con thi sao nua "
+    "bang o dau vi tai bao nhieu mot nay".split()
 )
 
 
