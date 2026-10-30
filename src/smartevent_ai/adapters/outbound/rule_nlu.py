@@ -65,7 +65,9 @@ _CITY_VALUE = "(?:" + "|".join(re.escape(marker) for marker, _ in CITY_ALIASES) 
 _CITY_UPDATE = re.compile(
     rf"(?:(?:(?:tìm(?: sự kiện)? )?(?:ở|tại) |"
     rf"(?:đổi|chuyển)(?: thành phố)? (?:sang|thành) )?{_CITY_VALUE}|"
-    rf"bỏ(?: bộ lọc)? thành phố(?: {_CITY_VALUE})?|mọi thành phố|"
+    rf"bỏ(?: bộ lọc)?(?:\s+(?:thành phố|tp\.?|tp))?(?: {_CITY_VALUE})?|"
+    rf"không (?:ở|tại|chọn)(?:\s+(?:thành phố|tp\.?|tp))?\s+{_CITY_VALUE}|"
+    rf"mọi thành phố|"
     rf"tất cả thành phố|không giới hạn thành phố)(?: (?:thì sao|thi sao|nhé|nhe|ạ|a|thôi|thoi))?[.!?]*"
 )
 
@@ -82,15 +84,19 @@ class RuleBasedVietnameseNLU:
             start, end = self._dates(norm)
             if start is not None:
                 patch = replace(patch, start_from=start, start_before=end)
-            if any(x in norm for x in ("bỏ giới hạn ngày", "bỏ ngày", "mọi thời gian")):
+            if any(
+                x in norm for x in ("bỏ giới hạn ngày", "bỏ ngày", "mọi thời gian")
+            ) or re.search(r"\b(?:bỏ|bo)\s+tháng(?:\s+\d{1,2})?\b", norm):
                 patch = replace(
                     patch, removed_slots=patch.removed_slots | {Slot.START_FROM, Slot.START_BEFORE}
                 )
-            if result.intent in (Intent.POLICY_FAQ, Intent.PUBLIC_HELP):
+            if result.intent in (Intent.POLICY_FAQ, Intent.PUBLIC_HELP, Intent.REFUND_POLICY):
                 patch = replace(
                     patch,
                     faq_topic="thanh toán"
                     if any(x in norm for x in ("thanh toán", "momo", "vnpay", "ví"))
+                    else "hoàn tiền"
+                    if any(x in norm for x in ("hoàn", "refund"))
                     else "hướng dẫn",
                 )
             merged = merge_state(state, patch)
@@ -115,7 +121,13 @@ class RuleBasedVietnameseNLU:
 
     def _dates(self, text: str) -> tuple[datetime | None, datetime | None]:
         local = self._now().astimezone(timezone(timedelta(hours=7)))
-        match = re.search(r"tháng\s+(\d{1,2})(?:[ /-](\d{4}))?", text)
+        match = None
+        for m in re.finditer(r"tháng\s+(\d{1,2})(?:[ /-](\d{4}))?", text):
+            prefix = text[: m.start()]
+            if re.search(r"(?:bỏ|bo)\s*$", prefix):
+                continue
+            match = m
+            break
         if match:
             month = int(match.group(1))
             year = (
@@ -123,7 +135,7 @@ class RuleBasedVietnameseNLU:
                 if match.group(2)
                 else local.year + (int(match.group(1)) < local.month)
             )
-        elif "tháng sau" in text:
+        elif "tháng sau" in text and not re.search(r"(?:bỏ|bo)\s+tháng sau", text):
             month = local.month % 12 + 1
             year = local.year + (local.month == 12)
         else:
@@ -147,14 +159,21 @@ class RuleBasedVietnameseNLU:
         intent = self._classify_intent(norm)
         if (
             state.faq_topic
-            and state.active_intent in (Intent.POLICY_FAQ, Intent.PUBLIC_HELP)
-            and intent in (Intent.CLARIFY, Intent.PUBLIC_HELP, Intent.POLICY_FAQ)
+            and state.active_intent in (Intent.POLICY_FAQ, Intent.PUBLIC_HELP, Intent.REFUND_POLICY)
+            and intent
+            in (Intent.CLARIFY, Intent.PUBLIC_HELP, Intent.POLICY_FAQ, Intent.REFUND_POLICY)
             and norm.startswith(("còn ", "con "))
             and not any(k in norm for k in ("sự kiện", "vé của tôi", "đơn hàng", "giao dịch"))
         ):
-            intent = Intent.POLICY_FAQ
+            intent = (
+                state.active_intent
+                if state.active_intent is Intent.REFUND_POLICY
+                else Intent.POLICY_FAQ
+            )
         if state.active_intent is Intent.SEARCH_EVENT and (
-            "bỏ giới hạn giá" in norm or norm.startswith(("tháng ", "bỏ ngày", "bỏ giới hạn ngày"))
+            "bỏ giới hạn giá" in norm
+            or norm.startswith(("tháng ", "bỏ ngày", "bỏ giới hạn ngày", "bỏ tháng"))
+            or re.search(r"\b(?:bỏ|bo)\s+tháng(?:\s+\d{1,2})?\b", norm)
         ):
             intent = Intent.SEARCH_EVENT
         removed: set[Slot] = set()
@@ -162,14 +181,27 @@ class RuleBasedVietnameseNLU:
         if any(x in norm for x in ("bắt đầu lại", "xóa tất cả tiêu chí", "xóa toàn bộ tiêu chí")):
             clear_group = ClearGroup.ALL_SLOTS
             state = DialogueState()
-        if any(
-            x in norm
-            for x in (
-                "bỏ bộ lọc thành phố",
-                "bỏ thành phố",
-                "mọi thành phố",
-                "tất cả thành phố",
-                "không giới hạn thành phố",
+        if (
+            any(
+                x in norm
+                for x in (
+                    "bỏ bộ lọc thành phố",
+                    "bỏ thành phố",
+                    "mọi thành phố",
+                    "tất cả thành phố",
+                    "không giới hạn thành phố",
+                )
+            )
+            or re.search(
+                rf"\b(?:bỏ|bo)(?:\s+bộ lọc)?(?:\s+(?:thành phố|tp\.?|tp))?\s+{_CITY_VALUE}\b",
+                norm,
+            )
+            or (
+                city is None
+                and re.search(
+                    rf"\b(?:không (?:ở|tại|chọn)|ngoại trừ)(?:\s+(?:thành phố|tp\.?|tp))?\s+{_CITY_VALUE}\b",
+                    norm,
+                )
             )
         ):
             removed.add(Slot.CITY)
@@ -177,7 +209,9 @@ class RuleBasedVietnameseNLU:
             removed.add(Slot.BUDGET_AMOUNT)
             state = merge_state(state, DialoguePatch(removed_slots=frozenset(removed)))
 
-        if any(x in norm for x in ("bỏ giới hạn ngày", "bỏ ngày", "mọi thời gian")):
+        if any(x in norm for x in ("bỏ giới hạn ngày", "bỏ ngày", "mọi thời gian")) or re.search(
+            r"\b(?:bỏ|bo)\s+tháng(?:\s+\d{1,2})?\b", norm
+        ):
             removed.update((Slot.START_FROM, Slot.START_BEFORE))
         if (
             state.active_intent is Intent.SEARCH_EVENT
@@ -235,6 +269,7 @@ class RuleBasedVietnameseNLU:
                 _CITY_UPDATE.fullmatch(norm) is not None
                 or bool(removed)
                 or norm.startswith("tháng ")
+                or budget_amount is not None
             )
         )
         if city_continuation and state.active_intent is not None:
@@ -242,7 +277,12 @@ class RuleBasedVietnameseNLU:
             # Explicit account/policy requests and unknown text keep their intent.
             intent = state.active_intent
         search_query = self._extract_search_query(norm) if intent is Intent.SEARCH_EVENT else None
-        if intent is Intent.SEARCH_EVENT and search_query is None and not city_continuation:
+        if (
+            intent is Intent.SEARCH_EVENT
+            and search_query is None
+            and not city_continuation
+            and not (state.search_query and budget_amount is not None)
+        ):
             removed.add(Slot.SEARCH_QUERY)
         patch = DialoguePatch(
             city=city,
@@ -277,7 +317,8 @@ class RuleBasedVietnameseNLU:
             for match in re.finditer(r"(?<!\w)" + re.escape(marker) + r"(?!\w)", norm):
                 prefix = norm[max(0, match.start() - 40) : match.start()]
                 if not re.search(
-                    r"(?:không (?:ở|chọn)|bỏ(?: bộ lọc)?(?: thành phố)?|ngoại trừ)\s*$", prefix
+                    r"(?:không (?:ở|tại|chọn|phải(?: ở)?)|bỏ(?: bộ lọc)?|ngoại trừ)\s*(?:(?:thành phố|tp\.?|tp)\s*)?$",
+                    prefix,
                 ):
                     matches.append((match.start(), canonical))
         return max(matches)[1] if matches else None

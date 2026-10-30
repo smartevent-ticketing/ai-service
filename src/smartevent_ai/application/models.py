@@ -55,12 +55,21 @@ class EventCard:
     def _from_projection(cls, row: dict[str, Any]) -> "EventCard":
         if not isinstance(row, dict):
             raise ValueError("event must be an object")
-        for key, maximum in (("name", 255), ("city", 80), ("venueName", 255)):
-            value = row.get(key)
-            if value is None and key != "name":
-                continue
-            if not isinstance(value, str) or not value.strip() or len(value) > maximum:
-                raise ValueError("invalid event text")
+        city = row.get("city")
+        if city == "" or (isinstance(city, str) and not city.strip()):
+            city = None
+        venue_name = row.get("venueName")
+        if venue_name == "" or (isinstance(venue_name, str) and not venue_name.strip()):
+            venue_name = None
+
+        name = row.get("name")
+        if not isinstance(name, str) or not name.strip() or len(name) > 255:
+            raise ValueError("invalid event text")
+
+        for val, maximum in ((city, 100), (venue_name, 255)):
+            if val is not None:
+                if not isinstance(val, str) or not val.strip() or len(val) > maximum:
+                    raise ValueError("invalid event text")
         for key in ("startTime", "endTime", "priceObservedAt"):
             value = row.get(key)
             if value is not None:
@@ -91,11 +100,11 @@ class EventCard:
                 raise ValueError("unsupported price basis")
         return cls(
             UUID(row["id"]),
-            row["name"],
+            name,
             slug,
             f"/events/{slug}",
-            row.get("city"),
-            row.get("venueName"),
+            city,
+            venue_name,
             row.get("startTime"),
             row.get("endTime"),
             price,

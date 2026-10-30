@@ -8,12 +8,14 @@ import asyncio
 import pytest
 from smartevent_ai.adapters.outbound.rule_nlu import RuleBasedVietnameseNLU
 from smartevent_ai.adapters.outbound.model_understanding import parse_model_understanding
-from smartevent_ai.adapters.inbound.http_api import DialogueStateDTO, ChatResponseDTO
-from smartevent_ai.domain.dialogue import DialogueState, Intent, Scope, merge_state
+from smartevent_ai.adapters.inbound.http_api import DialogueStateDTO, ChatResponseDTO, create_app
+from smartevent_ai.domain.dialogue import DialogueState, Intent, Scope, Slot, merge_state
 from smartevent_ai.domain.search import EventSearchCriteria
 from smartevent_ai.application.chat import ChatUseCase
 from smartevent_ai.application.models import ChatCommand, EventCard
 from smartevent_ai.domain.errors import ContractViolation
+from smartevent_ai.infrastructure.settings import Settings
+from fastapi.testclient import TestClient
 
 NOW = datetime(2026, 10, 30, tzinfo=timezone.utc)
 
@@ -319,3 +321,159 @@ def test_remote_reader_preserves_explicit_degraded_bm25_mode(monkeypatch):
     reader = http_reader.HttpPolicyReader("http://knowledge:8010", "TEST_ONLY_" * 4)
     assert _inline_run(reader.answer("payment")).mode == "degraded_bm25"
     assert reader.status() == "last_read_degraded"
+
+
+def test_remote_reader_parses_valid_citations(monkeypatch):
+    import json
+    from smartevent_ai.adapters.outbound.knowledge import http_reader
+
+    class Response:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def aiter_bytes(self):
+            yield json.dumps(
+                {
+                    "answer": "Chính sách hoàn tiền",
+                    "citations": [
+                        {
+                            "source_id": "TEST-REFUND",
+                            "version": "1.0.0",
+                            "title": "Refund Policy",
+                            "canonical_uri": "https://example.com/refund",
+                            "chunk_id": "c1",
+                            "heading_path": ["Mục 1", "Điều 1"],
+                            "start": 0,
+                            "end": 100,
+                        }
+                    ],
+                    "mode": "remote_extractive",
+                }
+            ).encode()
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        def stream(self, *args, **kwargs):
+            return Response()
+
+    monkeypatch.setattr(http_reader.httpx, "AsyncClient", lambda **kwargs: Client())
+    reader = http_reader.HttpPolicyReader("http://knowledge:8010", "TEST_ONLY_" * 4)
+    ans = _inline_run(reader.answer("payment"))
+    assert ans.mode == "remote_extractive"
+    assert len(ans.citations) == 1
+    assert ans.citations[0].source_id == "TEST-REFUND"
+    assert reader.status() == "last_read_ok"
+
+
+def test_model_remove_delta_overrides_entities():
+    state = DialogueState(city="Hà Nội")
+    delta = [{"op": "REMOVE", "slot": "city"}]
+    payload = {
+        "primary_intent": "SEARCH_EVENT",
+        "entities": {"city": "Hà Nội"},
+        "state_delta": delta,
+    }
+    result = parse_model_understanding(payload, state)
+    merged = merge_state(state, result.patch)
+    assert merged.city is None
+
+
+def test_rule_nlu_bo_thang_removes_date_filter():
+    nlu = RuleBasedVietnameseNLU(lambda: NOW)
+    initial = nlu.parse("Tìm sự kiện tháng 11", DialogueState())
+    state = merge_state(DialogueState(), initial.patch)
+    assert state.start_from is not None
+
+    removed = nlu.parse("bỏ tháng 11", state)
+    merged = merge_state(state, removed.patch)
+    assert merged.start_from is None and merged.start_before is None
+    assert Slot.START_FROM in removed.patch.removed_slots
+
+
+def test_rule_nlu_budget_followup_preserves_search_query():
+    nlu = RuleBasedVietnameseNLU(lambda: NOW)
+    first = nlu.parse("Tìm concert Blackpink", DialogueState())
+    state = merge_state(DialogueState(), first.patch)
+    assert state.search_query == "concert blackpink"
+
+    second = nlu.parse("dưới 500k mỗi vé", state)
+    merged = merge_state(state, second.patch)
+    assert merged.search_query == "concert blackpink"
+    assert merged.budget_amount == 500000
+
+
+def test_rule_nlu_city_negation_compound_prefix():
+    nlu = RuleBasedVietnameseNLU(lambda: NOW)
+    state = DialogueState(city="Hồ Chí Minh", active_intent=Intent.SEARCH_EVENT)
+
+    parsed_khong_o = nlu.parse("không ở tp.hcm", state)
+    merged1 = merge_state(state, parsed_khong_o.patch)
+    assert merged1.city is None
+
+    parsed_bo = nlu.parse("bỏ tp.hcm", state)
+    merged2 = merge_state(state, parsed_bo.patch)
+    assert merged2.city is None
+
+
+def test_rule_nlu_refund_policy_followup():
+    nlu = RuleBasedVietnameseNLU(lambda: NOW)
+    first = nlu.parse("Chính sách hoàn tiền thế nào?", DialogueState())
+    assert first.intent is Intent.REFUND_POLICY
+    state = merge_state(DialogueState(), first.patch)
+
+    second = nlu.parse("Còn thời hạn bao lâu?", state)
+    assert second.intent in (Intent.REFUND_POLICY, Intent.POLICY_FAQ)
+
+
+def test_event_card_city_length_and_empty_string_handling():
+    base = {
+        "id": str(uuid4()),
+        "name": "Live Concert",
+        "slug": "live-concert",
+    }
+    # 90 characters city is valid (max 100)
+    long_city = "A" * 90
+    card1 = EventCard.from_projection({**base, "city": long_city})
+    assert card1.city == long_city
+
+    # > 100 characters city raises ContractViolation
+    with pytest.raises(ContractViolation):
+        EventCard.from_projection({**base, "city": "A" * 101})
+
+    # Empty string treated as None
+    card_empty = EventCard.from_projection({**base, "city": "", "venueName": ""})
+    assert card_empty.city is None
+    assert card_empty.venue_name is None
+
+
+def test_ready_probe_with_model_backend_not_permanently_degraded():
+    from smartevent_ai.application.ports import BusinessReadTools
+
+    class MockTools(BusinessReadTools):
+        def available_names(self):
+            return ["search_events"]
+
+        def capabilities(self):
+            return {"search_events": {}}
+
+        async def execute(self, name, arguments):
+            return {"data": []}
+
+    app = create_app(Settings(nlu_backend="ollama", _env_file=None))
+    app.state.gateway = MockTools()
+
+    with TestClient(app) as client:
+        ready = client.get("/health/ready").json()
+        assert ready["status"] == "ready"
+        assert ready["model_backend"] == "ollama"

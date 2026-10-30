@@ -43,6 +43,7 @@ def parse_model_understanding(payload: dict[str, Any], state: DialogueState) -> 
         if query:
             values["search_query"] = query
     removed: set[Slot] = set()
+    set_operations: dict[Slot, Any] = {}
     clear = None
     delta = payload.get("state_delta", [])
     if not isinstance(delta, list) or len(delta) > 20:
@@ -72,10 +73,15 @@ def parse_model_understanding(payload: dict[str, Any], state: DialogueState) -> 
                 raise ValueError("state_delta cannot override routing")
             if op == "REMOVE":
                 removed.add(slot)
+                values.pop(slot, None)
+                values.pop(slot.value, None)
             elif op == "SET" and operation.get("value") is not None:
-                values[slot.value] = operation["value"]
+                set_operations[slot] = operation["value"]
             else:
                 raise ValueError("invalid state operation")
+    for slot, val in set_operations.items():
+        removed.discard(slot)
+        values[slot.value] = val
     for key in ("quantity", "budget_amount"):
         value = values.get(key)
         if value is not None and type(value) is not int:

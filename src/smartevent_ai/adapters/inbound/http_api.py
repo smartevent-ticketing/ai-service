@@ -203,7 +203,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content={
                 "code": "INVALID_REQUEST",
                 "message": "Invalid chat request",
-                "request_id": request.state.request_id,
+                "request_id": getattr(request.state, "request_id", None),
                 "retryable": False,
             },
         )
@@ -214,16 +214,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health/ready")
     def ready() -> dict[str, object]:
-        enabled = gateway.available_names()
+        active_gateway = getattr(app.state, "gateway", gateway)
+        enabled = active_gateway.available_names()
         return {
-            "status": "ready" if enabled and configuration.nlu_backend == "rule" else "degraded",
+            "status": "ready" if enabled else "degraded",
             "business_tools_enabled": enabled,
             "model_backend": configuration.nlu_backend,
             "last_nlu_mode": app.state.chat.last_nlu_mode,
             "nlu_availability": "available"
             if configuration.nlu_backend == "rule"
             else "unverified",
-            "business_tool_capabilities": gateway.capabilities(),
+            "business_tool_capabilities": active_gateway.capabilities(),
             "policy_retrieval": {
                 "status": app.state.chat.policy_status(),
                 "answer_mode": app.state.chat.policy_answer_mode(),
@@ -267,7 +268,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             content={
                 "code": code,
                 "message": "Request could not be completed",
-                "request_id": request.state.request_id,
+                "request_id": getattr(request.state, "request_id", None),
                 "retryable": retryable,
             },
         )
