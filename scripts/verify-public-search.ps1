@@ -11,6 +11,11 @@ $outputRoot = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $outputRoot) { throw 'Output directory must be new; preserve previous evidence.' }
 $jarPath = Join-Path $backendRepoRoot 'build/libs/smart-event-backend-0.0.1-SNAPSHOT.jar'
 if (-not (Test-Path -LiteralPath $jarPath)) { throw 'Build the backend bootJar first.' }
+$jar = Get-Item -LiteralPath $jarPath
+$newerSources = Get-ChildItem -LiteralPath (Join-Path $backendRepoRoot 'src/main') -Recurse -File |
+    Where-Object { $_.LastWriteTimeUtc -gt $jar.LastWriteTimeUtc }
+if ($newerSources) { throw 'Backend sources are newer than bootJar; rebuild bootJar before verification.' }
+$backendJarHash = (Get-FileHash -LiteralPath $jarPath -Algorithm SHA256).Hash.ToLowerInvariant()
 New-Item -ItemType Directory -Path $outputRoot | Out-Null
 $fixtureSuffix = [Guid]::NewGuid().ToString('N').Substring(0, 10)
 $fixtureNetwork = "ai-search-$fixtureSuffix"
@@ -52,6 +57,10 @@ else:
     $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
     $report.database_snapshot_before = $before
     $report.database_snapshot_after = $after
+    $report | Add-Member -NotePropertyName backend_jar_sha256 -NotePropertyValue $backendJarHash
+    if ((Get-FileHash -LiteralPath $jarPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $backendJarHash) {
+        throw 'Backend JAR changed during verification; refusing deployment.'
+    }
     $report.note = 'Independent full-row fixture database digests match before/after live tests.'
     $report | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $reportPath -Encoding utf8
     $null = Invoke-FixtureDocker run --rm --mount "type=bind,source=$aiRepoRoot,target=/workspace,readonly" --mount "type=bind,source=$outputRoot,target=/evidence" --workdir /workspace -e PYTHONPATH=/workspace/src $AiImage python scripts/public_search_deployment.py prepare --report /evidence/live-evidence.json --output /evidence/configs

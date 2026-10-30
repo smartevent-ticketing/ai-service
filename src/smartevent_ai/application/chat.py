@@ -11,7 +11,12 @@ from smartevent_ai.application.models import (
     EventCard,
     NavigationAction,
 )
-from smartevent_ai.application.ports import BusinessReadTools, LanguageUnderstanding
+from smartevent_ai.application.ports import (
+    BusinessReadTools,
+    LanguageUnderstanding,
+    WarmableLanguageUnderstanding,
+    ModelRuntime,
+)
 from smartevent_ai.application.knowledge_ports import PolicyReader
 from smartevent_ai.application.response_composer import ResponseComposer
 from smartevent_ai.domain.dialogue import (
@@ -26,6 +31,7 @@ from smartevent_ai.domain.errors import (
     ContractViolation,
     ToolUnavailable,
     UpstreamTimeout,
+    ModelUnavailable,
 )
 from smartevent_ai.domain.search import EventSearchCriteria
 
@@ -37,12 +43,33 @@ class ChatUseCase:
         tools: BusinessReadTools,
         composer: ResponseComposer | None = None,
         policies: PolicyReader | None = None,
+        nlu_timeout_seconds: float = 12.0,
+        model_runtime: ModelRuntime | None = None,
     ) -> None:
         self._nlu = nlu
         self._tools = tools
         self._composer = composer or ResponseComposer()
         self._policies = policies
         self.last_nlu_mode = "not_probed"
+        self._nlu_timeout_seconds = nlu_timeout_seconds
+        self._model_runtime = model_runtime
+
+    def model_runtime_status(self) -> dict[str, object]:
+        return self._model_runtime.status() if self._model_runtime else {"mode": "independent"}
+
+    def close_models(self) -> None:
+        if self._model_runtime:
+            self._model_runtime.close()
+
+    def warmup_nlu(self) -> None:
+        """Exercise the configured provider outside the per-request deadline."""
+        self.last_nlu_mode = "unavailable"
+        if not isinstance(self._nlu, WarmableLanguageUnderstanding):
+            raise ModelUnavailable("Configured NLU does not support startup warmup")
+        result = self._nlu.warmup()
+        if result.mode != "model":
+            raise ModelUnavailable("NLU startup warmup returned fallback")
+        self.last_nlu_mode = result.mode
 
     def policy_status(self) -> str:
         return self._policies.status() if self._policies is not None else "disabled"
@@ -56,7 +83,7 @@ class ChatUseCase:
         try:
             understood = await asyncio.wait_for(
                 asyncio.to_thread(self._nlu.parse, request.message, request.previous_state),
-                timeout=12.0,
+                timeout=self._nlu_timeout_seconds,
             )
         except TimeoutError as exc:
             self.last_nlu_mode = "unavailable"

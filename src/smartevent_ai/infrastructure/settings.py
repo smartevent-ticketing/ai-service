@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, model_validator
 from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     nlu_adapter_path: Path | None = Field(default=None)
     nlu_base_model: str = "Qwen/Qwen2.5-1.5B-Instruct"
     nlu_load_4bit: bool = True
+    nlu_preload: bool = False
+    peft_sequential: bool = False
+    nlu_timeout_seconds: float = Field(default=12.0, gt=0, le=600)
+    rag_generation_timeout_seconds: float = Field(default=15.0, gt=0, le=600)
 
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_nlu_model: str = "smartevent-nlu:1.5b"
@@ -42,6 +46,18 @@ class Settings(BaseSettings):
     rag_adapter_path: Path | None = Field(default=None)
     rag_base_model: str = "Qwen/Qwen2.5-3B-Instruct"
     rag_load_4bit: bool = True
+
+    @model_validator(mode="after")
+    def sequential_requires_local_peft(self) -> "Settings":
+        if self.peft_sequential and (
+            self.nlu_backend != "peft"
+            or self.rag_backend != "peft"
+            or self.policy_backend != "artifact"
+            or not self.nlu_load_4bit
+            or not self.rag_load_4bit
+        ):
+            raise ValueError("Sequential demo requires local PEFT NLU/RAG with 4-bit loading")
+        return self
 
     @property
     def effective_config_dir(self) -> Path:

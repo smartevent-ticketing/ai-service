@@ -9,6 +9,7 @@ from smartevent_ai.adapters.outbound.peft_nlu import PeftTransformerNLU
 from smartevent_ai.adapters.outbound.read_only_gateway import ReadOnlyToolGateway
 from smartevent_ai.adapters.outbound.rule_nlu import RuleBasedVietnameseNLU
 from smartevent_ai.adapters.outbound.safe_transport import SafeBackendTransport
+from smartevent_ai.adapters.outbound.sequential_peft import SequentialPeftPool
 from smartevent_ai.application.chat import ChatUseCase
 from smartevent_ai.application.knowledge_ports import PolicySynthesizer, PolicyReader
 from smartevent_ai.adapters.outbound.knowledge.http_reader import HttpPolicyReader
@@ -24,6 +25,7 @@ from smartevent_ai.infrastructure.knowledge_runtime import (
 def build_chat(settings: Settings) -> tuple[ChatUseCase, ReadOnlyToolGateway]:
     transport = SafeBackendTransport(settings.backend_base_url)
     gateway = ReadOnlyToolGateway(settings.registry_path, settings.gates_path, transport)
+    pool = SequentialPeftPool() if settings.peft_sequential else None
 
     synthesizer: PolicySynthesizer | None = None
     if settings.rag_backend == "ollama":
@@ -37,12 +39,14 @@ def build_chat(settings: Settings) -> tuple[ChatUseCase, ReadOnlyToolGateway]:
             adapter_path=settings.rag_adapter_path,
             base_model_name=settings.rag_base_model,
             load_4bit=settings.rag_load_4bit,
+            model_pool=pool,
         )
 
     policies: PolicyReader = RuntimePolicyReader(
         ReviewedRagConfig(settings.effective_config_dir),
         test_environment=settings.app_env == "test",
         synthesizer=synthesizer,
+        generation_timeout_seconds=settings.rag_generation_timeout_seconds,
     )
 
     if settings.policy_backend == "http":
@@ -65,8 +69,15 @@ def build_chat(settings: Settings) -> tuple[ChatUseCase, ReadOnlyToolGateway]:
             adapter_path=settings.nlu_adapter_path,
             base_model_name=settings.nlu_base_model,
             load_4bit=settings.nlu_load_4bit,
+            model_pool=pool,
         )
     else:
         nlu = RuleBasedVietnameseNLU()
 
-    return ChatUseCase(nlu, gateway, policies=policies), gateway
+    return ChatUseCase(
+        nlu,
+        gateway,
+        policies=policies,
+        nlu_timeout_seconds=settings.nlu_timeout_seconds,
+        model_runtime=pool,
+    ), gateway

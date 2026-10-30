@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from uuid import UUID
 from datetime import datetime
 from dataclasses import asdict
@@ -190,7 +194,31 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     configuration = settings or Settings()
     chat, gateway = build_chat(configuration)
-    app = FastAPI(title="SmartEvent AI Read-only Service", version=__version__)
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        if configuration.nlu_preload and configuration.nlu_backend == "peft":
+            app.state.nlu_startup = "loading"
+            logging.getLogger(__name__).info("Loading and warming NLU before accepting requests")
+            try:
+                await asyncio.to_thread(app.state.chat.warmup_nlu)
+            except Exception:
+                app.state.nlu_startup = "failed"
+                await asyncio.to_thread(app.state.chat.close_models)
+                raise
+            app.state.nlu_startup = "ready"
+            logging.getLogger(__name__).info("NLU startup warmup complete: mode=model")
+        try:
+            yield
+        finally:
+            await asyncio.to_thread(app.state.chat.close_models)
+
+    app = FastAPI(title="SmartEvent AI Read-only Service", version=__version__, lifespan=lifespan)
+    app.state.nlu_startup = (
+        "pending"
+        if configuration.nlu_preload and configuration.nlu_backend == "peft"
+        else "disabled"
+    )
     app.state.chat = chat
     app.state.gateway = gateway
     app.add_middleware(RequestTelemetry)
@@ -216,14 +244,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def ready() -> dict[str, object]:
         active_gateway = getattr(app.state, "gateway", gateway)
         enabled = active_gateway.available_names()
+        nlu_available = (
+            configuration.nlu_backend == "rule" or app.state.chat.last_nlu_mode == "model"
+        )
         return {
-            "status": "ready" if enabled else "degraded",
+            "status": "ready" if enabled and nlu_available else "degraded",
             "business_tools_enabled": enabled,
             "model_backend": configuration.nlu_backend,
             "last_nlu_mode": app.state.chat.last_nlu_mode,
-            "nlu_availability": "available"
-            if configuration.nlu_backend == "rule"
-            else "unverified",
+            "nlu_availability": "available" if nlu_available else "unverified",
+            "nlu_startup": app.state.nlu_startup,
+            "model_runtime": app.state.chat.model_runtime_status(),
             "business_tool_capabilities": active_gateway.capabilities(),
             "policy_retrieval": {
                 "status": app.state.chat.policy_status(),

@@ -26,6 +26,17 @@ class FakeGenerator:
         return self.response_text
 
 
+def test_warmup_requires_real_model_mode() -> None:
+    import pytest
+    from smartevent_ai.domain.errors import ModelUnavailable
+
+    valid = PeftTransformerNLU(generator=FakeGenerator('{"primary_intent":"GREETING"}'))
+    assert valid.warmup().mode == "model"
+    invalid = PeftTransformerNLU(generator=FakeGenerator("invalid JSON"))
+    with pytest.raises(ModelUnavailable):
+        invalid.warmup()
+
+
 def test_parses_clean_json_into_understanding() -> None:
     fake_json = json.dumps(
         {

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from smartevent_ai.adapters.outbound.rule_nlu import CITY_ALIASES, RuleBasedVietnameseNLU
+from smartevent_ai.adapters.outbound.sequential_peft import SequentialPeftPool
 from smartevent_ai.domain.dialogue import (
     ClarificationReason,
     DialogueState,
@@ -46,6 +47,7 @@ class PeftTransformerNLU:
         load_4bit: bool = True,
         generator: Callable[[str], str] | None = None,
         now: Callable[[], datetime] | None = None,
+        model_pool: SequentialPeftPool | None = None,
     ) -> None:
         self._adapter_path = Path(adapter_path) if adapter_path is not None else None
         self._base_model_name = base_model_name
@@ -57,6 +59,15 @@ class PeftTransformerNLU:
         self._model: Any = None
         self._tokenizer: Any = None
         self._lock = threading.Lock()
+        self._model_pool = model_pool
+        if model_pool is not None:
+            model_pool.register("nlu", self.unload)
+
+    def unload(self) -> None:
+        """Called only when the shared pool owns the inference lock."""
+        with self._lock:
+            self._model = None
+            self._tokenizer = None
 
     def _ensure_loaded(self) -> None:
         if self._generator is not None or self._model is not None:
@@ -70,6 +81,8 @@ class PeftTransformerNLU:
             import torch as _torch
 
             torch_any: Any = _torch
+            if self._model_pool is not None and not torch_any.cuda.is_available():
+                raise RuntimeError("Sequential NF4 demo requires CUDA")
             from peft import PeftModel
             from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
@@ -118,7 +131,9 @@ class PeftTransformerNLU:
             base = AutoModelForCausalLM.from_pretrained(
                 self._base_model_name,
                 quantization_config=quant_config,
-                device_map="auto" if torch_any.cuda.is_available() else "cpu",
+                device_map={"": 0}
+                if self._model_pool is not None
+                else ("auto" if torch_any.cuda.is_available() else "cpu"),
                 torch_dtype=torch_any.float16
                 if torch_any.cuda.is_available()
                 else torch_any.float32,
@@ -128,6 +143,11 @@ class PeftTransformerNLU:
             self._model.eval()
 
     def _generate(self, user_text: str, state: DialogueState | None = None) -> str:
+        if self._model_pool is not None:
+            return self._model_pool.run("nlu", lambda: self._generate_once(user_text, state))
+        return self._generate_once(user_text, state)
+
+    def _generate_once(self, user_text: str, state: DialogueState | None = None) -> str:
         user_content = user_text
         if state is not None and (
             state.active_intent is not None
@@ -222,12 +242,21 @@ class PeftTransformerNLU:
     def parse(self, text: str, state: DialogueState) -> Understanding:
         from dataclasses import replace
 
-        if not self._inference_slots.acquire(blocking=False):
+        if not self._inference_slots.acquire(blocking=self._model_pool is not None):
             return replace(self._fallback_nlu.parse(text, state), mode="fallback")
         try:
             return self._parse_once(text, state)
         finally:
             self._inference_slots.release()
+
+    def warmup(self) -> Understanding:
+        """Load and exercise the same provider before accepting HTTP traffic."""
+        from smartevent_ai.domain.errors import ModelUnavailable
+
+        result = self.parse("Tìm giúp tôi 2 vé ở Hà Nội.", DialogueState())
+        if result.mode != "model":
+            raise ModelUnavailable("PEFT startup probe failed; refusing to serve fallback as ready")
+        return result
 
     def _parse_once(self, text: str, state: DialogueState) -> Understanding:
         try:

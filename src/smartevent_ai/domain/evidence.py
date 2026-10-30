@@ -61,11 +61,22 @@ def _refund_claim(text: str) -> int:
 
 
 def _relevance_ratio(query: str, text: str, context: str) -> float:
-    query_terms = _terms(query)
+    # Question scaffolding is not a claim that the source needs to substantiate.
+    # Remove complete, anchored phrases rather than dropping words such as
+    # "the" globally: accent folding also turns the content word "thẻ" into it.
+    original_query = _normalize(query)
+    normalized_query = original_query
+    normalized_query = re.sub(r"^(?:lam (?:nhu )?the nao de|lam sao de)\s+", "", normalized_query)
+    normalized_query = re.sub(r"^con\s+(.+?)\s+thi\s+sao[?!.]*$", r"\1", normalized_query)
+    query_terms = _terms(normalized_query)
     if not query_terms or not query_terms.intersection(_terms(text)):
         return 0.0  # A matching title alone cannot make unrelated text evidence.
     haystack = _terms(context + "\n" + text)
     matched = query_terms.intersection(haystack)
+    if normalized_query != original_query and matched != query_terms:
+        # Removing a question wrapper must not turn an unsupported qualifier
+        # (e.g. a payment provider absent from the corpus) into generic evidence.
+        return 0.0
     return len(matched) / len(query_terms)
 
 

@@ -1,0 +1,44 @@
+name: Publish pinned Qwen base models
+
+on:
+  push:
+    branches: [publish/base-models-qwen25-20261030]
+    paths:
+      - .github/workflows/publish-base-models.yml
+      - scripts/release/publish_base_models.py
+      - scripts/release/download_base_models.py
+      - models/base-models-source.json
+      - docs/architecture/BASE_MODEL_DISTRIBUTION.md
+      - tests/release/test_base_model_release.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-pinned-qwen25-bases
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    if: github.repository == 'smartevent-ticketing/ai-service'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test splitting, reconstruction and integrity failures
+        run: python -m unittest discover -s tests/release -p test_base_model_release.py -v
+      - name: Download pinned originals, verify and publish split assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONUNBUFFERED: '1'
+        run: >-
+          python scripts/release/publish_base_models.py
+          --source-manifest models/base-models-source.json
+          --workdir "${{ runner.temp }}/qwen-base-mirror"
+          --target "${{ github.sha }}"

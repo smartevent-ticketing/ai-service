@@ -1,0 +1,67 @@
+{
+  "format_version": 1,
+  "models": [
+    {
+      "key": "nlu",
+      "revision": "989aa7980e4cf806f80c7fef2b1adb7bc71aa306",
+      "repo_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 660,
+          "sha256": "98d2ff8cc47488d08a2b0b3acf4eb99ef210779b42bd48605f6b8e36acdbf670"
+        },
+        {
+          "path": "generation_config.json",
+          "size": 242,
+          "sha256": "e558847a8b4402616f1273797b015104dc266fe4b520056fca88823ba8f8ebe6"
+        },
+        {
+          "path": "model.safetensors",
+          "size": 3087467144,
+          "sha256": "dd924a11b4c220f385b51ffa522daea7c9f3d850e31b162bb5661df483c6d3ee"
+        },
+        {
+          "path": "LICENSE"
+        }
+      ],
+      "license": "Apache-2.0"
+    },
+    {
+      "key": "rag",
+      "revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1",
+      "repo_id": "Qwen/Qwen2.5-3B-Instruct",
+      "files": [
+        {
+          "path": "config.json",
+          "size": 661,
+          "sha256": "eed00b17e22553979d090fa492e587e92885e328914c8e0b0b78f0a0d3576b3b"
+        },
+        {
+          "path": "generation_config.json",
+          "size": 242,
+          "sha256": "ea35dfb6fc5051b01114f9b995820d55dab01ed33ee490f6378b442af82c09f9"
+        },
+        {
+          "path": "model-00001-of-00002.safetensors",
+          "size": 3968658944,
+          "sha256": "67347b23fb4165b652eb6611f5e1f2a06dfcddba8e909df1b2b0b1857bee06c2"
+        },
+        {
+          "path": "model-00002-of-00002.safetensors",
+          "size": 2203268048,
+          "sha256": "a40d941d0e7e0b966ad8b62bb6d6b7c88cce1299197b599d9d0a4ce59aabfc1d"
+        },
+        {
+          "path": "model.safetensors.index.json",
+          "size": 35581,
+          "sha256": "bc8aaa0c87d4335177e01c765f1de0db81661c67c1a72fbfb0d521b09f5ddc56"
+        },
+        {
+          "path": "LICENSE"
+        }
+      ],
+      "license": "Qwen-Research"
+    }
+  ]
+}

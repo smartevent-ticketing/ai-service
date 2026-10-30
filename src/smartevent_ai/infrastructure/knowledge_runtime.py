@@ -36,10 +36,12 @@ class RuntimePolicyReader:
         config: ReviewedRagConfig,
         test_environment: bool = False,
         synthesizer: PolicySynthesizer | None = None,
+        generation_timeout_seconds: float = 15.0,
     ) -> None:
         self._config = config
         self._store = ArtifactKnowledgeStore(RuntimeArtifacts(config), allow_test=test_environment)
         self._synthesizer = synthesizer
+        self._generation_timeout_seconds = generation_timeout_seconds
 
     @property
     def answer_mode(self) -> str:
@@ -71,7 +73,11 @@ class RuntimePolicyReader:
             config.max_answer_chars,
             synthesizer=self._synthesizer,
         )
-        timeout_sec = 15.0 if self._synthesizer is not None else (config.timeout_ms / 1000)
+        timeout_sec = (
+            self._generation_timeout_seconds
+            if self._synthesizer is not None
+            else (config.timeout_ms / 1000)
+        )
         try:
             return await asyncio.wait_for(
                 asyncio.to_thread(use_case.answer, query), timeout=timeout_sec

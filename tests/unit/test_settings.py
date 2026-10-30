@@ -29,6 +29,7 @@ def test_nlu_settings_defaults_and_override(tmp_path: Path) -> None:
     assert defaults.nlu_backend == "rule"
     assert defaults.nlu_adapter_path is None
     assert defaults.nlu_load_4bit is True
+    assert defaults.nlu_preload is False
 
     custom = Settings(
         nlu_backend="peft",
@@ -44,6 +45,55 @@ def test_nlu_settings_defaults_and_override(tmp_path: Path) -> None:
     assert custom.nlu_load_4bit is False
     assert custom.rag_backend == "ollama"
     assert custom.rag_adapter_path == tmp_path / "rag_adapter"
+
+
+def test_bootstrap_is_lazy_and_startup_warmup_refuses_failed_models(monkeypatch) -> None:
+    import pytest
+    from smartevent_ai.adapters.outbound.peft_nlu import PeftTransformerNLU
+    from smartevent_ai.domain.dialogue import Understanding, Intent
+    from smartevent_ai.domain.errors import ModelUnavailable
+    from smartevent_ai.infrastructure.bootstrap import build_chat
+
+    calls = []
+
+    def warmup(self):
+        calls.append(self)
+        return Understanding(Intent.GREETING, mode="model")
+
+    monkeypatch.setattr(PeftTransformerNLU, "warmup", warmup)
+    build_chat(Settings(nlu_backend="peft", nlu_preload=False, _env_file=None))
+    assert not calls
+    chat, gateway = build_chat(Settings(nlu_backend="peft", nlu_preload=True, _env_file=None))
+    assert not calls  # Constructing an app must not load GPU weights at import time.
+    assert chat.last_nlu_mode == "not_probed"
+    chat.warmup_nlu()
+    assert len(calls) == 1
+    assert chat.last_nlu_mode == "model"
+    assert not gateway.available_names()
+
+    def fail(self):
+        raise ModelUnavailable("warmup failed")
+
+    monkeypatch.setattr(PeftTransformerNLU, "warmup", fail)
+    with pytest.raises(ModelUnavailable):
+        chat.warmup_nlu()
+    assert chat.last_nlu_mode == "unavailable"
+
+
+def test_startup_warmup_rejects_fallback(monkeypatch) -> None:
+    import pytest
+    from smartevent_ai.adapters.outbound.peft_nlu import PeftTransformerNLU
+    from smartevent_ai.domain.dialogue import Understanding, Intent
+    from smartevent_ai.domain.errors import ModelUnavailable
+    from smartevent_ai.infrastructure.bootstrap import build_chat
+
+    monkeypatch.setattr(
+        PeftTransformerNLU, "warmup", lambda _: Understanding(Intent.GREETING, mode="fallback")
+    )
+    chat, _ = build_chat(Settings(nlu_backend="peft", _env_file=None))
+    with pytest.raises(ModelUnavailable):
+        chat.warmup_nlu()
+    assert chat.last_nlu_mode == "unavailable"
 
 
 def test_bootstrap_builds_nlu_by_backend_setting() -> None:

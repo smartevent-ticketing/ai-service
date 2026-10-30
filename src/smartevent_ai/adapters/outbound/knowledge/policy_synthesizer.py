@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import httpx
+from smartevent_ai.adapters.outbound.sequential_peft import SequentialPeftPool
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,7 @@ class PeftPolicySynthesizer:
         base_model_name: str = "Qwen/Qwen2.5-3B-Instruct",
         load_4bit: bool = True,
         generator: Callable[[str], str] | None = None,
+        model_pool: SequentialPeftPool | None = None,
     ) -> None:
         self._adapter_path = Path(adapter_path) if adapter_path is not None else None
         self._base_model_name = base_model_name
@@ -92,6 +94,15 @@ class PeftPolicySynthesizer:
         self._model: Any = None
         self._tokenizer: Any = None
         self._lock = threading.Lock()
+        self.last_mode = "not_probed"
+        self._model_pool = model_pool
+        if model_pool is not None:
+            model_pool.register("rag", self.unload)
+
+    def unload(self) -> None:
+        with self._lock:
+            self._model = None
+            self._tokenizer = None
 
     def _ensure_loaded(self) -> None:
         if self._generator is not None or self._model is not None:
@@ -105,6 +116,8 @@ class PeftPolicySynthesizer:
             import torch as _torch
 
             torch_any: Any = _torch
+            if self._model_pool is not None and not torch_any.cuda.is_available():
+                raise RuntimeError("Sequential NF4 demo requires CUDA")
             from peft import PeftModel
             from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
@@ -126,7 +139,9 @@ class PeftPolicySynthesizer:
             base = AutoModelForCausalLM.from_pretrained(
                 self._base_model_name,
                 quantization_config=quant_config,
-                device_map="auto" if torch_any.cuda.is_available() else "cpu",
+                device_map={"": 0}
+                if self._model_pool is not None
+                else ("auto" if torch_any.cuda.is_available() else "cpu"),
                 torch_dtype=torch_any.float16
                 if torch_any.cuda.is_available()
                 else torch_any.float32,
@@ -137,39 +152,51 @@ class PeftPolicySynthesizer:
 
     def synthesize(self, query: str, context: str) -> str:
         try:
-            if self._generator is not None:
-                return self._generator(f"{context}\n\n{query}")
-
-            self._ensure_loaded()
-            assert self._tokenizer is not None and self._model is not None
-
-            import torch as _torch
-
-            torch_any: Any = _torch
-
-            user_content = f"Ngữ cảnh tài liệu:\n{context}\n\nCâu hỏi: {query}"
-            messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ]
-            prompt = self._tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True
-            )
-            inputs = self._tokenizer(prompt, return_tensors="pt").to(self._model.device)
-
-            with torch_any.no_grad():
-                output_tokens = self._model.generate(
-                    **inputs,
-                    max_new_tokens=300,
-                    do_sample=False,
-                    pad_token_id=self._tokenizer.pad_token_id,
-                )
-            prompt_len = inputs["input_ids"].shape[1]
-            gen_tokens = output_tokens[0][prompt_len:]
-            gen_text = self._tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
-            return gen_text or context
+            if self._model_pool is not None:
+                answer = self._model_pool.run("rag", lambda: self._synthesize_once(query, context))
+            else:
+                answer = self._synthesize_once(query, context)
+            self.last_mode = "model" if self._generator is None else "generator"
+            return answer
         except Exception as e:
+            self.last_mode = "fallback"
             logger.warning(
-                "PeftPolicySynthesizer failed (%s); falling back to extractive context", e
+                "PeftPolicySynthesizer failed (%s); using extractive context", type(e).__name__
             )
             return context
+
+    def _synthesize_once(self, query: str, context: str) -> str:
+        # Let the pool see load/inference failures before fallback suppresses them.
+        if self._generator is not None:
+            return self._generator(f"{context}\n\n{query}")
+
+        self._ensure_loaded()
+        assert self._tokenizer is not None and self._model is not None
+
+        import torch as _torch
+
+        torch_any: Any = _torch
+
+        user_content = f"Ngữ cảnh tài liệu:\n{context}\n\nCâu hỏi: {query}"
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ]
+        prompt = self._tokenizer.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        inputs = self._tokenizer(prompt, return_tensors="pt").to(self._model.device)
+
+        with torch_any.no_grad():
+            output_tokens = self._model.generate(
+                **inputs,
+                max_new_tokens=300,
+                do_sample=False,
+                pad_token_id=self._tokenizer.pad_token_id,
+            )
+        prompt_len = inputs["input_ids"].shape[1]
+        gen_tokens = output_tokens[0][prompt_len:]
+        gen_text = self._tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
+        if not gen_text:
+            raise ValueError("Empty PEFT generation")
+        return gen_text
