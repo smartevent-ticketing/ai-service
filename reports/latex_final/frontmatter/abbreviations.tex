@@ -1,0 +1,57 @@
+% ==============================================================================
+% DANH MỤC TỪ VIẾT TẮT
+% ==============================================================================
+\chapter*{Danh mục từ viết tắt}
+\phantomsection
+\addcontentsline{toc}{chapter}{Danh mục từ viết tắt}
+\vspace{-0.3cm}
+
+\begin{table}[!ht]
+\centering
+\caption{Giải thích các từ viết tắt sử dụng trong báo cáo}
+\label{tab:abbreviations}
+\footnotesize
+\renewcommand{\arraystretch}{1.08}
+\begin{tabularx}{\textwidth}{|L{2.0cm}|L{4.4cm}|X|}
+\hline
+\rowcolor{tableheader}
+\textbf{Viết tắt} & \textbf{Tiếng Anh} & \textbf{Ý nghĩa trong hệ thống} \\
+\hline
+ACID & Atomicity, Consistency, Isolation, Durability & 4 tính chất đảm bảo an toàn giao dịch trong cơ sở dữ liệu PostgreSQL \\
+\hline
+AST & Abstract Syntax Tree & Cây cú pháp trừu tượng dùng để quét và kiểm tra mã nguồn tự động \\
+\hline
+BFF & Backend For Frontend & Lớp proxy trung gian trên Next.js giúp lưu JWT an toàn trong Cookie \\
+\hline
+BM25 & Best Matching 25 & Thuật toán tìm kiếm văn bản dựa trên tần suất từ khóa \\
+\hline
+ChatML & Chat Markup Language & Định dạng dữ liệu hội thoại chuẩn gồm 3 vai trò: \texttt{system}, \texttt{user}, \texttt{assistant} \\
+\hline
+DST & Dialogue State Tracking & Cơ chế theo dõi và cập nhật trạng thái cuộc trò chuyện qua nhiều lượt \\
+\hline
+IPN & Instant Payment Notification & Thông báo kết quả thanh toán tự động từ cổng thanh toán gọi về Backend \\
+\hline
+LoRA & Low-Rank Adaptation & Kỹ thuật tinh chỉnh mô hình ngôn ngữ bằng các ma trận hạng thấp \\
+\hline
+NF4 & 4-bit NormalFloat & Chuẩn nén trọng số xuống 4-bit theo phân phối chuẩn trong QLoRA \\
+\hline
+NLU & Natural Language Understanding & Mô-đun hiểu ngôn ngữ tự nhiên (phân loại ý định và bóc tách thực thể) \\
+\hline
+ONNX & Open Neural Network Exchange & Định dạng giúp chạy mô hình nhúng vector nhanh trên CPU \\
+\hline
+PII & Personally Identifiable Information & Dữ liệu nhạy cảm của cá nhân (email, số điện thoại, mã bí mật QR) \\
+\hline
+QLoRA & Quantized Low-Rank Adaptation & Kết hợp nén mô hình 4-bit NF4 và gắn nhánh LoRA để huấn luyện hiệu quả trên GPU nhỏ \\
+\hline
+RAG & Retrieval-Augmented Generation & Kỹ thuật tìm kiếm đoạn văn bản chính sách rồi đưa vào mô hình sinh câu trả lời \\
+\hline
+RRF & Reciprocal Rank Fusion & Công thức gộp kết quả tìm kiếm từ khóa BM25 và tìm kiếm vector ngữ nghĩa \\
+\hline
+SFT & Supervised Fine-Tuning & Huấn luyện tinh chỉnh có giám sát trên tập dữ liệu câu hỏi - câu trả lời mẫu \\
+\hline
+SLM & Small Language Model & Mô hình ngôn ngữ kích thước nhỏ (từ 1 tỷ đến 3 tỷ tham số) \\
+\hline
+TTL & Time-To-Live & Thời gian giữ chỗ tối đa của một phiên đặt vé (10 phút) \\
+\hline
+\end{tabularx}
+\end{table}

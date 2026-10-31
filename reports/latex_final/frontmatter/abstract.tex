@@ -1,0 +1,12 @@
+% Tóm tắt đã đối chiếu nguồn ngày 30/10/2026.
+\chapter*{Tóm tắt đồ án}
+\phantomsection
+\addcontentsline{toc}{chapter}{Tóm tắt đồ án}
+
+Đồ án nghiên cứu trợ lý hội thoại tiếng Việt cho nền tảng đặt vé sự kiện \textbf{SmartEvent}, tập trung vào hiểu ý định, tư vấn theo ngân sách và tra cứu hướng dẫn có nguồn. Dịch vụ \texttt{ai-service} được tổ chức theo Clean Architecture và giới hạn quyền nghiệp vụ ở chế độ \texttt{READ\_ONLY}: chatbot hướng dẫn người dùng tự thao tác, không tạo giữ chỗ, đơn hàng, thanh toán hoặc hoàn tiền.
+
+Báo cáo phân biệt ba loại kết quả: thiết kế mục tiêu, thí nghiệm mô hình và bằng chứng kiểm thử triển khai. Phần nghiên cứu mô tả gói dữ liệu tổng hợp 90.000 mẫu theo đặc tả v1.2 và hai bộ adapter QLoRA cho \texttt{Qwen2.5-1.5B-Instruct} và \texttt{Qwen2.5-3B-Instruct}. Các số liệu huấn luyện 93,85\% và 98,50\% là \textit{token accuracy} được lưu trong bản báo cáo trước; chúng không phải độ chính xác ý định, chất lượng trả lời hay mức an toàn của toàn hệ thống. Chưa có đủ nhật ký và manifest đi kèm để tái lập độc lập toàn bộ thí nghiệm này.
+
+Phần triển khai có baseline NLU theo luật, truy hồi BM25 trên artifact chỉ đọc, kiểm tra nguồn và trích dẫn, cùng các adapter mô hình tùy chọn. ONNX và hợp nhất thứ hạng RRF được đánh giá ngoại tuyến; chưa có bằng chứng nghiệm thu Hybrid RAG phục vụ chat. Registry khai báo 14 công cụ GET nhưng cấu hình mặc định vẫn tắt toàn bộ; profile local phải được đánh giá riêng trước khi bật công cụ hoặc kho tri thức.
+
+Kết quả kiểm chứng ngày 30/10/2026 ghi nhận 134 kiểm thử web đạt, 22 kiểm thử backend trọng tâm đạt, 310 kiểm thử AI ngoại tuyến đạt ở lượt chạy cơ sở và 37 kiểm thử liên quan đạt ở lượt cập nhật, cùng 5 kiểm thử đơn vị hạ tầng đạt. Các tập AI có thể giao nhau nên không cộng thành một tổng. PostgreSQL/Docker, mô hình thật và E2E bốn dịch vụ chưa được nghiệm thu trong đợt này. Đóng góp chính của đồ án là cơ sở triển khai có kiểm soát quyền và quy trình đánh giá có thể tiếp tục hoàn thiện; chưa kết luận hệ thống sẵn sàng vận hành thương mại.

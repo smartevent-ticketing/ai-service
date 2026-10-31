@@ -1,0 +1,204 @@
+\chapter{Xây dựng dữ liệu và tích hợp mô hình AI vào hệ thống}
+\label{chap:training_integration}
+
+Chương này phân biệt thiết kế dữ liệu và tích hợp runtime. Thống kê 90.000 mẫu và cấu hình chạy được giữ từ bản báo cáo trước; chưa đủ manifest/log để tái lập độc lập. Corpus tổng hợp dùng huấn luyện không mặc nhiên là nguồn được duyệt cho chat. Baseline là NLU theo luật và BM25; Qwen/Hybrid RAG là tích hợp tùy chọn còn cần nghiệm thu.
+
+\section{Xây dựng và Chuẩn hóa Kho Dữ liệu Huấn luyện \& Đánh giá RAG}
+\label{sec:data_generator_pipeline}
+
+\subsection{Phương pháp thiết lập kịch bản gốc và mở rộng câu tự nhiên}
+
+Dữ liệu cần đa dạng cách hỏi nhưng có nhãn và nguồn kiểm tra được. LIMA~\cite{lima_zhou_2023} là tham khảo về chất lượng dữ liệu, không chứng minh tập tổng hợp của đồ án đúng. Nhãn gán bằng quy tắc vẫn cần oracle và rà soát độc lập.
+
+Để giải quyết thách thức này, dự án thiết lập quy trình xây dựng và chuẩn hóa dữ liệu chặt chẽ gồm 3 giai đoạn cốt lõi:
+\begin{enumerate}[nosep]
+  \item \textbf{Giai đoạn 1 -- Seed}: Bản báo cáo trước ghi 399 seed NLU theo Ontology v1.2 và 46 nhóm câu hỏi trên 4 văn bản. Nhãn sinh bằng quy tắc giúp kiểm tra lại, không loại trừ lỗi trong seed, nhãn hoặc phép biến đổi.
+  \item \textbf{Giai đoạn 2 -- Biến thể có kiểm soát}: Thiết kế mở rộng cách hỏi bằng mô hình ngôn ngữ và kiểm tra thực thể/nguồn. Biến thể không giữ đúng nghĩa phải bị loại; JSON hợp lệ chưa đủ xác nhận nhãn đúng.
+  \item \textbf{Giai đoạn 3 -- Giả lập phương ngữ và thói quen gõ phím tiếng Việt}: Nhóm tích hợp bộ quy tắc biến đổi hình thái bề mặt để phản ánh chân thực thói quen nhắn tin của người dùng Việt: viết tắt và teencode (\textit{``k''}, \textit{``dc''}, \textit{``bn''}, \textit{``sg''}, \textit{``hn''}, \textit{``củ''}, \textit{``lít''}), gõ tiếng Việt không dấu (\textit{``tim 2 ve xem nhac o ha noi''}) và lối diễn đạt pha trộn thuật ngữ công nghệ/sự kiện (\textit{``check order''}, \textit{``refund''}, \textit{``book vé early bird''}).
+\end{enumerate}
+
+\subsection{Chuẩn hóa thực thể tự động (Entity Normalization) và phân tách chống rò rỉ}
+
+Mô hình sinh có thể vừa trích xuất vừa chuẩn hóa thực thể. Tỷ lệ 42\% slot cần chuẩn hóa trong bản thống kê cũ mô tả tần suất nhãn, không phải độ chính xác dự đoán. Các ví dụ sau là quy tắc nhãn mục tiêu, không xác nhận runtime hỗ trợ mọi biến thể:
+\begin{itemize}[nosep]
+  \item \textbf{Chuẩn hóa địa danh}: Người dùng gõ \textit{``SG''}, \textit{``Sài Gòn''}, \textit{``TPHCM''} hay \textit{``hcm''} đều được đưa về giá trị chuẩn \texttt{"TP Hồ Chí Minh"}; \textit{``HN''} quy về \texttt{"Hà Nội"}.
+  \item \textbf{Chuẩn hóa tiền tệ và số lượng}: Các cách nói như \textit{``500k''}, \textit{``nửa triệu''}, \textit{``1 củ rưỡi''} được chuyển thẳng thành số nguyên \texttt{500000} hoặc \texttt{1500000} kèm đơn vị \texttt{budget\_currency = "VND"}.
+  \item \textbf{Phân tách theo họ kịch bản}: Các biến thể cùng \texttt{scenario\_family} phải nằm trong cùng tập. JSON Schema chỉ kiểm tra cấu trúc, không xác nhận nhãn đúng hay không rò rỉ ngữ nghĩa. Bảng~\ref{tab:kaggle_dataset_stats} là thống kê lịch sử cần manifest và phép kiểm tra lại để xác nhận.
+\end{itemize}
+
+\begin{table}[!htbp]
+\centering
+\caption{Thống kê theo bản báo cáo trước; chưa tái lập độc lập}
+\label{tab:kaggle_dataset_stats}
+\small
+\begin{tabularx}{\textwidth}{|L{4.8cm}|R{2.4cm}|C{3.2cm}|X|}
+\hline
+\rowcolor{tableheader}
+\textbf{Tên file dữ liệu} & \textbf{Số lượng mẫu} & \textbf{Số kịch bản gốc} & \textbf{Mục đích sử dụng} \\
+\hline
+\texttt{nlu\_train.jsonl} & 24.194 & 320 cores (82 họ) & Dữ liệu huấn luyện NLU 1.5B \\
+\hline
+\texttt{nlu\_validation.jsonl} & 5.806 & 79 cores (19 họ) & Validation theo thống kê cũ \\
+\hline
+\textbf{Tổng dữ liệu NLU} & \textbf{30.000} & \textbf{399 cores} & \textbf{Phủ đủ 21 Intents \& 19 Actions} \\
+\hline
+\texttt{rag\_\allowbreak sft\_\allowbreak train\_\allowbreak chatml.jsonl} & 30.000 & 27 họ chính sách & Dữ liệu huấn luyện RAG-QA 3B \\
+\hline
+\texttt{rag\_\allowbreak benchmark\_\allowbreak dev.jsonl} & 15.790 & 19 họ chính sách & Đánh giá truy hồi tập Dev \\
+\hline
+\texttt{rag\_\allowbreak benchmark\_\allowbreak test.jsonl} & 14.210 & 19 họ chính sách & Đánh giá truy hồi tập Test \\
+\hline
+\textbf{Tổng toàn bộ gói dữ liệu} & \textbf{90.000} & \textbf{445 kịch bản} & \textbf{Thống kê gói tổng hợp} \\
+\hline
+\end{tabularx}
+\end{table}
+
+Dưới đây là ví dụ một mẫu dữ liệu NLU đa lượt trong \texttt{nlu\_train.jsonl} và một mẫu dữ liệu RAG-QA theo chuẩn hội thoại ChatML trong \texttt{rag\_\allowbreak sft\_\allowbreak train\_\allowbreak chatml.jsonl}:
+
+\begin{databox}{Minh họa nhãn lịch sử v1.2, không phải schema runtime: mẫu NLU trong \texttt{nlu\_train.jsonl}}
+\footnotesize\ttfamily
+\{\\
+\hspace*{1em}"dataset\_contract": "1.2", "split": "train",\\
+\hspace*{1em}"scenario\_family": "search\_event\_multi\_turn\_refinement",\\
+\hspace*{1em}"utterance": "Đổi sang tìm ở Sài Gòn giúp mình nhé, lấy 2 vé tầm 1 triệu rưỡi đổ lại thôi",\\
+\hspace*{1em}"prior\_state": \{"active\_intent": "SEARCH\_EVENT", "slots": \{"city": "Hà Nội", "category\_name": "Nhạc sống"\}\},\\
+\hspace*{1em}"primary\_intent": "SEARCH\_EVENT",\\
+\hspace*{1em}"entities": \{"city": "TP Hồ Chí Minh", "quantity": 2, "budget\_amount": 1500000, "budget\_currency": "VND", "budget\_scope": "TOTAL"\},\\
+\hspace*{1em}"state\_delta": [\\
+\hspace*{2em}\{"operation": "SET", "slot": "city", "value": "TP Hồ Chí Minh"\},\\
+\hspace*{2em}\{"operation": "SET", "slot": "quantity", "value": 2\},\\
+\hspace*{2em}\{"operation": "SET", "slot": "budget\_amount", "value": 1500000\}\\
+\hspace*{1em}],\\
+\hspace*{1em}"proposed\_action": "SEARCH\_EVENTS"\\
+\}
+\end{databox}
+
+\begin{databox}{Minh họa dữ liệu thí nghiệm RAG-QA định dạng ChatML trong \texttt{rag\_\allowbreak sft\_\allowbreak train\_\allowbreak chatml.jsonl}}
+\footnotesize\ttfamily
+\{\\
+\hspace*{1em}"case\_id": "qa-boundary-booking-prohibited",\\
+\hspace*{1em}"messages": [\\
+\hspace*{2em}\{"role": "system", "content": "Bạn là Trợ lý AI SmartEvent... Hoạt động theo nguyên tắc READ\_ONLY... --- [TÀI LIỆU CĂN CỨ: SE-POL-ASSISTANT-BOUNDARY@1.0.0] --- Trợ lý AI SmartEvent tuyệt đối bị nghiêm cấm tạo phiên giữ chỗ, tạo đơn hàng mới hoặc trừ tiền... --- HẾT TÀI LIỆU ---"\},\\
+\hspace*{2em}\{"role": "user", "content": "Trợ lý AI SmartEvent có thể tự đặt vé hoặc thanh toán hộ tôi được không?"\},\\
+\hspace*{2em}\{"role": "assistant", "content": "Không. Trợ lý AI SmartEvent hoạt động theo nguyên tắc READ\_ONLY tuyệt đối và bị nghiêm cấm tạo đơn hàng, giữ chỗ hoặc thực hiện thanh toán thay cho người dùng. Bạn vui lòng tự thao tác đặt vé và thanh toán trực tiếp trên trang web SmartEvent. [Nguồn: SE-POL-ASSISTANT-BOUNDARY@1.0.0]"\}
+\hspace*{1em}]\\
+\}
+\end{databox}
+
+\section{Thiết kế kho tri thức RAG và cấu hình hai mô hình Qwen2.5}
+\label{sec:rag_corpus_and_model_specs}
+
+\subsection{Chuẩn hóa 4 văn bản chính sách và kỹ thuật phân đoạn có cấu trúc}
+
+Bốn tài liệu ở Bảng~\ref{tab:4_policy_docs_detail} thuộc thiết kế/thí nghiệm lịch sử. Hash xác nhận nội dung, không tự cấp thẩm quyền ban hành. Chúng không mặc nhiên là quy chế kinh doanh hiện hành. Corpus hướng dẫn và quyết định phê duyệt của profile local được quản lý riêng.
+
+\begin{table}[!htbp]
+\centering
+\caption{Bốn mã tài liệu thí nghiệm; không xác nhận chính sách hiện hành}
+\label{tab:4_policy_docs_detail}
+\small
+\begin{tabularx}{\textwidth}{|L{4.8cm}|C{2.0cm}|X|}
+\hline
+\rowcolor{tableheader}
+\textbf{Mã tài liệu (\texttt{doc\_id})} & \textbf{Phiên bản} & \textbf{Nội dung các quy định chính được chuẩn hóa} \\
+\hline
+\texttt{SE-POL-ASSISTANT-\allowbreak BOUNDARY} & \texttt{1.0.0} & Quy định ranh giới an toàn bất biến \texttt{READ\_ONLY}; nghiêm cấm trợ lý ảo thực thi giao dịch thay người dùng (tự tạo đơn, giữ chỗ, trừ tiền, hủy vé, chuyển nhượng hoặc truy cập dữ liệu cá nhân của khách hàng khác); định hình chuẩn mực từ chối an toàn kèm chỉ dẫn tự phục vụ trên web. \\
+\hline
+\texttt{SE-REG-SALE-PHASE} & \texttt{1.0.0} & Chủ đề giai đoạn mở bán và giữ chỗ. Mức giảm giá/số lượng cần nguồn được duyệt theo từng sự kiện, không dùng ví dụ huấn luyện như cam kết bán hàng. \\
+\hline
+\texttt{SE-GUI-USER-ACTION} & \texttt{1.0.0} & Chủ đề người dùng tự đặt vé, thanh toán, xuất trình vé. Không suy ra QR là mã động hoặc chống mọi ảnh chụp chỉ từ kích thước token. \\
+\hline
+\texttt{SE-POL-REFUND-RULE} & \texttt{1.0.0} & Chủ đề điều kiện/thời hạn hoàn tiền. Cần quy chế được duyệt; chatbot không xét duyệt hoàn tiền hoặc dùng dữ liệu tổng hợp làm cam kết. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\noindent\textbf{Cấu hình phân đoạn:} Áp dụng \texttt{StructureChunker} đã mô tả tại Mục~\ref{sec:rag_subsystem_design}, với \texttt{max\_tokens = 384}, \texttt{overlap\_tokens = 64} và thuật toán \texttt{structure-token-v1}. Đường dẫn tiêu đề và tiêu đề cột bảng được giữ trong ngữ cảnh; mỗi đoạn có \texttt{chunk\_id} để kiểm tra toàn vẹn. Cần kiểm tra lại giới hạn token và tính đầy đủ của điều khoản sau khi chia đoạn.
+
+\noindent\textbf{Vòng đời và thẩm quyền nguồn:} Metadata và thời gian giúp loại nguồn không đủ điều kiện; nội dung vẫn cần người chịu trách nhiệm phê duyệt:
+$$\texttt{DRAFT} \longrightarrow \texttt{APPROVED} \longrightarrow \texttt{REVOKED / SUPERSEDED}$$
+Mỗi tài liệu có \texttt{SourceMetadata} để nhận diện phiên bản, nội dung và thẩm quyền. Hàm \texttt{eligible(now)} áp dụng các điều kiện tại Công thức~\ref{eq:source_eligibility}; nguồn nháp, bị thu hồi, bị thay thế hoặc hết hiệu lực bị loại. Việc kiểm tra được thực hiện khi nạp và trước khi trả lời, không thay thế phê duyệt nội dung.
+
+\subsection{Vai trò và thông số cấu hình của hai mô hình Qwen2.5 (1.5B và 3B)}
+
+Thay vì dùng một mô hình duy nhất cho mọi tác vụ, nhóm thiết kế kiến trúc hai mô hình nhỏ chuyên biệt được tinh chỉnh bằng kỹ thuật QLoRA 4-bit (NF4) để tối ưu giữa tốc độ phản hồi và chất lượng câu trả lời tiếng Việt, với thông số cấu hình chi tiết tại Bảng \ref{tab:hyperparameters_comparison}:
+\begin{itemize}[nosep]
+  \item \textbf{NLU Qwen2.5-1.5B}: adapter nghiên cứu xuất JSON từ câu hỏi/trạng thái. Parser phải kiểm tra theo hợp đồng runtime; chưa có nghiệm thu model thật trong đợt 30/10. Baseline mặc định vẫn theo luật.
+  \item \textbf{RAG-QA Qwen2.5-3B}: adapter tổng hợp tùy chọn. Bản báo cáo trước ghi lấy 6.000 mẫu từ kho SFT 30.000 mẫu, học một epoch với batch hiệu dụng 16, tương ứng 375 bước. Sự nhất quán số học không thay thế log chọn mẫu, trainer và manifest validation.
+\end{itemize}
+
+\begin{table}[!htbp]
+\centering
+\caption{Cấu hình QLoRA: LoRA xác nhận từ adapter; thông số chạy khác theo báo cáo trước}
+\label{tab:hyperparameters_comparison}
+\small
+\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\textwidth}{|L{4.2cm}|C{5.2cm}|X|}
+\hline
+\rowcolor{tableheader}
+\textbf{Thông số cấu hình} & \textbf{Hướng 1: NLU (\texttt{Qwen2.5-1.5B})} & \textbf{Hướng 2: RAG-QA (\texttt{Qwen2.5-3B})} \\
+\hline
+Mô hình nền tảng (Base Model) & \texttt{Qwen/\allowbreak Qwen2.5-1.5B-Instruct} & \texttt{Qwen/\allowbreak Qwen2.5-3B-Instruct} \\
+\hline
+Chuẩn lượng tử hóa 4-bit & \texttt{nf4}, Double Quant, \texttt{float16} & \texttt{nf4}, Double Quant, \texttt{float16} \\
+\hline
+Cấu hình nhánh LoRA & $r = 16$, $\alpha = 32$, dropout $= 0{,}05$ & $r = 16$, $\alpha = 32$, dropout $= 0{,}05$ \\
+\hline
+Các lớp chiếu gắn LoRA & \texttt{q, k, v, o, gate, up, down\_\allowbreak proj} & \texttt{q, k, v, o, gate, up, down\_\allowbreak proj} \\
+\hline
+Quy mô dữ liệu Train / Val & 24.194 mẫu Train / 5.806 mẫu Val & 6.000 mẫu SFT / 15.790 mẫu Dev \\
+\hline
+Effective Batch Size & $4 \times 4 = 16$ (1 Epoch / 1.513 steps) & $2 \times 8 = 16$ (1 Epoch / 375 steps) \\
+\hline
+Tốc độ học (Learning rate) & $2 \times 10^{-4}$ (Cosine, warmup 100) & $2 \times 10^{-4}$ (Cosine, warmup 50) \\
+\hline
+Bộ nhớ GPU VRAM (QLoRA 4-bit) & 3,8 GB / 15,0 GB (25,3\% T4) & 5,5 GB / 15,0 GB (36,7\% T4) \\
+\hline
+Gói trọng số đầu ra (Adapter) & \texttt{smartevent-nlu-\allowbreak qwen1.5b-final} & \texttt{smartevent-rag-\allowbreak qwen3b-final} \\
+\hline
+\end{tabularx}
+\end{table}
+
+\section{Tích hợp mô hình vào dịch vụ \texttt{ai-service} và luồng xử lý RAG}
+\label{sec:model_integration_aiservice}
+
+\subsection{Quy trình xử lý truy hồi và tổng hợp tri thức chính sách (RAG Pipeline)}
+
+\texttt{RetrievePolicy} chỉ được gọi khi cấu hình và nguồn thỏa gate. Luồng dưới đây phân biệt phần kiểm tra hiện có với lựa chọn truy hồi/sinh tùy cấu hình; chat không mặc định nạp hai model Qwen:
+\begin{enumerate}[nosep]
+  \item \textbf{Giai đoạn 1 -- Snapshot \& Cổng thẩm quyền (Eligibility Gate)}: Chụp nhanh trạng thái kho tri thức (\texttt{snapshot = store.snapshot()}). Hàm \texttt{eligible\_chunks()} loại bỏ ngay tài liệu hết hạn, chưa phê duyệt hoặc đã bị thu hồi.
+  \item \textbf{Giai đoạn 2 -- Truy hồi theo profile}: Baseline dùng BM25 trên artifact được duyệt. ONNX/RRF có thí nghiệm ngoại tuyến; knowledge service cần gate tích hợp riêng. Khi cho phép hạ cấp BM25 phải công bố effective mode, không báo đang chạy hybrid.
+  \item \textbf{Giai đoạn 3 -- Thẩm định bằng chứng và phản biện (Evidence Verdict)}: Các đoạn trích dẫn được chuyển qua bộ thẩm định \texttt{EvidenceJudge} để gán nhãn: giữ lại (\texttt{KEPT}), loại bỏ (\texttt{DROPPED}) hoặc gắn cờ \texttt{[BẰNG CHỨNG PHẢN BIỆN — cần đối chiếu]} (\texttt{CONFLICTS}) nếu phát hiện điều khoản loại trừ.
+  \item \textbf{Giai đoạn 4 -- Kiểm tra bất biến và khử trùng lặp (Freshness Check)}: Kiểm tra lại mã băm \texttt{catalog\_sha256} và \texttt{release\_id} sau truy hồi. Khử trùng lặp theo mục cha (\texttt{parent\_start}, \texttt{parent\_end}) và giới hạn ngữ cảnh dưới \texttt{max\_answer\_chars = 6000}.
+  \item \textbf{Giai đoạn 5 -- Trả lời có kiểm tra}: Mặc định trích xuất; model sinh là tùy chọn. Câu sinh phải bảo toàn bằng chứng đầy đủ và citation hợp lệ. Không đạt thì dùng fallback đủ điều kiện hoặc báo thiếu bằng chứng; không diễn đạt lại làm mất điều kiện/ngoại lệ.
+\end{enumerate}
+
+\subsection{Cơ chế kết nối mô hình và dự phòng an toàn (Extractive Fallback)}
+
+Trong tệp \nolinkurl{policy_synthesizer.py}, nhóm xây dựng hai adapter thực thi cổng \texttt{PolicySynthesizer}: (1) \texttt{OllamaPolicySynthesizer} kết nối máy chủ Ollama cục bộ (\texttt{temperature = 0.0}), và (2) \texttt{PeftPolicySynthesizer} nạp mô hình 4-bit NF4 kèm LoRA bằng thư viện \texttt{peft}.
+
+Đoạn mã~\ref{lst:ollama_fallback} minh họa rút gọn adapter; use case còn kiểm tra bằng chứng và trích dẫn. Bắt ngoại lệ và trả context là dự phòng khi sinh lỗi, không bảo đảm dịch vụ luôn sẵn sàng.
+
+\begin{lstlisting}[language=Python, basicstyle=\ttfamily\scriptsize, aboveskip=2pt, belowskip=2pt, caption={Minh họa rút gọn adapter Ollama; use case còn kiểm tra bằng chứng và citation}, label={lst:ollama_fallback}]
+class OllamaPolicySynthesizer:
+    def __init__(self, base_url="http://127.0.0.1:11434", model="smartevent-rag:3b", timeout=15.0, client=None):
+        self._base_url, self._model, self._timeout = base_url.rstrip("/"), model, timeout
+        self._client = client or httpx.Client(timeout=timeout)
+
+    def synthesize(self, query: str, context: str) -> str:
+        try:
+            payload = {
+                "model": self._model, "stream": False, "options": {"temperature": 0.0},
+                "messages": [{"role": "system", "content": SYSTEM_PROMPT},
+                             {"role": "user", "content": f"(*@Ngữ cảnh@*):\n{context}\n\n(*@Câu hỏi@*): {query}"}],
+            }
+            res = self._client.post(f"{self._base_url}/api/chat", json=payload)
+            res.raise_for_status()
+            ans = res.json().get("message", {}).get("content", "").strip()
+            return ans if ans else context
+        except Exception as e:
+            logger.warning("OllamaPolicySynthesizer failed (%s); fallback to context", e)
+            return context
+\end{lstlisting}
+
+\noindent Use case kiểm tra lại nguồn trước khi dùng trích đoạn dự phòng. Nguồn không còn hiệu lực hoặc không đủ bằng chứng dẫn tới phản hồi thiếu nguồn.

@@ -1,0 +1,58 @@
+% ==============================================================================
+% PHẦN MỞ ĐẦU: ĐẶT VẤN ĐỀ (NGẮN GỌN, TRỌNG TÂM)
+% ==============================================================================
+\chapter*{Đặt vấn đề}
+\phantomsection
+\addcontentsline{toc}{chapter}{Đặt vấn đề}
+\markboth{Đặt vấn đề}{Đặt vấn đề}
+
+\section*{1. Bối cảnh và lý do chọn đề tài}
+\phantomsection
+\addcontentsline{toc}{section}{1. Bối cảnh và lý do chọn đề tài}
+
+Đặt vé trực tuyến cần đồng thời quản lý giao dịch nhất quán và hỗ trợ khách hàng bằng thông tin đáng tin cậy. Đồ án SmartEvent tập trung vào hai nhóm khó khăn sau:
+
+Về giao dịch, nhiều khách cùng mua vào giờ mở bán có thể gây tranh chấp tồn kho. Trường hợp thanh toán đến sau khi phiên giữ chỗ hết hạn cần xử lý nhất quán tại backend; chatbot không được tự thay đổi giao dịch để giải quyết tình huống này.
+
+Về hỗ trợ, khách hỏi về sự kiện, ngân sách, quy chế và cách dùng vé bằng tiếng Việt đời thường, chẳng hạn \textit{``2 vé ở sg tầm 1 củ''}. Trợ lý cần hiểu viết tắt và ngữ cảnh nhiều lượt, đồng thời không bịa giá, tồn kho hay chính sách. Mô hình ngôn ngữ phải được tách khỏi quyền ghi dữ liệu nghiệp vụ.
+
+Nhóm thực hiện đề tài \textbf{``Xây dựng nền tảng đặt vé sự kiện SmartEvent tích hợp trợ lý ảo AI đa lượt''}, nghiên cứu NLU, xếp hạng vé theo ngân sách và truy hồi chính sách có nguồn trong dịch vụ \texttt{ai-service} dưới ranh giới quyền \texttt{READ\_ONLY}.
+
+\section*{2. Mục tiêu và phạm vi nghiên cứu}
+\phantomsection
+\addcontentsline{toc}{section}{2. Mục tiêu và phạm vi nghiên cứu}
+
+Trọng tâm nghiên cứu của đồ án đặt vào dịch vụ trợ lý ảo AI (\texttt{ai-service}) và quy trình huấn luyện mô hình, bao gồm các mục tiêu cụ thể:
+\begin{enumerate}[nosep]
+  \item Thiết kế và triển khai dịch vụ trợ lý ảo \texttt{ai-service} theo kiến trúc phần mềm sạch (Clean Architecture) với nguyên tắc bất biến chỉ đọc (\texttt{READ\_ONLY}): chỉ đọc dữ liệu để tư vấn và hướng dẫn, tuyệt đối không tự ý tạo đơn hàng, không giữ vé và không trừ tiền thay người dùng.
+  \item Xây dựng và chuẩn hóa kho tri thức chính sách RAG cùng bộ dữ liệu đối thoại tiếng Việt 90.000 mẫu (30.000 mẫu NLU đa lượt và 60.000 mẫu RAG-QA) mô phỏng trung thực các phong cách giao tiếp thực tế, áp dụng phân tách theo họ kịch bản nhằm giảm rò rỉ giữa các tập; kiểm tra giao nhau định danh cần được bổ sung bằng kiểm tra trùng lặp ngữ nghĩa và tập nghiệm thu độc lập.
+  \item Tinh chỉnh hai mô hình ngôn ngữ nhỏ bằng kỹ thuật nén 4-bit QLoRA trên GPU Tesla T4: mô hình \texttt{Qwen2.5-1.5B-Instruct} phục vụ bóc tách ý định, chuẩn hóa thực thể và cập nhật trạng thái hội thoại ra định dạng JSON; mô hình \texttt{Qwen2.5-3B-Instruct} phục vụ trả lời quy chế chính sách có trích dẫn nguồn kiểm chứng.
+  \item Tích hợp hệ thống trợ lý ảo với nền tảng giao dịch \texttt{smartevent-backend} và giao diện người dùng \texttt{smartevent-web} nhằm kiểm tra hợp đồng giao tiếp và từng thành phần; nghiệm thu liên dịch vụ, dữ liệu thật và hiệu năng là các bước đánh giá riêng.
+\end{enumerate}
+
+\noindent\textbf{Mốc đối chiếu.} Nội dung phản ánh mã nguồn và bằng chứng đến ngày 30/10/2026. Qwen/Hybrid RAG thuộc nghiên cứu và tích hợp tùy chọn; baseline không yêu cầu GPU. Phạm vi kiểm chứng và các cổng nghiệm thu còn mở được tập trung tại Chương~\ref{chap:results_evaluation}.
+
+\section*{3. Danh sách thành viên thực hiện}
+\phantomsection
+\addcontentsline{toc}{section}{3. Danh sách thành viên thực hiện}
+
+Đồ án được nghiên cứu và phát triển bởi nhóm sinh viên gồm 4 thành viên:
+\begin{enumerate}[nosep]
+  \item Trần Phùng Đức Anh -- Nhóm trưởng, phụ trách kiến trúc hệ thống, đường ống dữ liệu và huấn luyện mô hình.
+  \item Bùi Mạnh Tiến -- Thành viên, phụ trách xây dựng dịch vụ \texttt{ai-service}, giao vận và kiểm thử API.
+  \item Nguyễn Phúc Thanh -- Thành viên, phụ trách tích hợp giao diện \texttt{smartevent-web} và lớp BFF Proxy.
+  \item Trịnh Đăng Huy -- Thành viên, phụ trách quản lý dữ liệu PostgreSQL và hạ tầng Docker \texttt{smartevent-infra}.
+\end{enumerate}
+
+\section*{4. Bố cục của báo cáo}
+\phantomsection
+\addcontentsline{toc}{section}{4. Bố cục của báo cáo}
+
+Nội dung báo cáo đồ án tốt nghiệp được cấu trúc thành 4 chương chính và phần kết luận:
+\begin{itemize}[nosep]
+  \item \textbf{Chương 1: Cơ sở lý thuyết} -- Trình bày cơ sở lý thuyết về kiến trúc phần mềm sạch (Clean Architecture), nguyên lý mô hình ngôn ngữ lớn (kiến trúc Qwen2.5), kỹ thuật lượng tử hóa 4-bit QLoRA và nền tảng truy hồi lai ghép Hybrid RAG (kết hợp BM25 và mô hình nhúng ONNX qua thuật toán RRF).
+  \item \textbf{Chương 2: Phân tích và thiết kế hệ thống} -- Phân tích yêu cầu nghiệp vụ, thiết kế kiến trúc phân hệ RAG và ranh giới an toàn chỉ đọc (\texttt{READ\_ONLY}) với 4 tầng bảo vệ, danh mục 14 công cụ nghiệp vụ và bộ nhãn hội thoại Ontology v1.2 (21 Intents, 19 Actions).
+  \item \textbf{Chương 3: Xây dựng dữ liệu và tích hợp mô hình AI} -- Trình bày dữ liệu ChatML, cách chia theo họ kịch bản, cấu hình QLoRA cho hai mô hình Qwen2.5 và luồng truy hồi, tổng hợp, dự phòng theo profile.
+  \item \textbf{Chương 4: Thực nghiệm RAG, kiểm thử và đánh giá hệ thống} -- Phân biệt token accuracy với chất lượng tác vụ; đối chiếu thí nghiệm mô hình, benchmark truy hồi ngoại tuyến và kết quả kiểm thử ngày 30/10/2026, kèm giới hạn bằng chứng và các cổng nghiệm thu còn mở.
+  \item \textbf{Phần kết luận và hướng phát triển} -- Tổng kết các kết quả đạt được theo mục tiêu khóa học SIC, chỉ ra các hạn chế và đề xuất hướng mở rộng trong tương lai.
+\end{itemize}

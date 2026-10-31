@@ -1,0 +1,591 @@
+% ==============================================================================
+% CHƯƠNG 1: CƠ SỞ LÝ THUYẾT
+% ==============================================================================
+\chapter{Cơ sở lý thuyết}
+\label{chap:theory}
+
+Chương này trình bày cơ sở lý thuyết cho phân hệ trợ lý AI (\texttt{ai-service}), gồm:
+\begin{itemize}[nosep]
+  \item Kiến trúc Clean Architecture và các ranh giới bảo vệ an toàn cho dịch vụ AI;
+  \item Mô hình hóa bài toán hiểu ngôn ngữ tự nhiên (NLU) đa lượt và quản lý trạng thái hội thoại;
+  \item Kiến trúc mô hình ngôn ngữ nhỏ Qwen2.5 và kỹ thuật tinh chỉnh tham số hiệu quả QLoRA 4-bit trên GPU giới hạn;
+  \item Lý thuyết Truy hồi thông tin lai ghép (Hybrid RAG) kết hợp Okapi BM25, mô hình nhúng ngữ nghĩa đặc (Dense Semantic Embedding), thuật toán hợp nhất thứ hạng nghịch đảo (RRF), và cổng kiểm chứng an toàn Evidence Gate.
+\end{itemize}
+
+\section{Kiến trúc Clean Architecture và Ranh giới An toàn của Dịch vụ AI}
+\label{sec:theory_system_arch}
+
+\subsection{Kiến trúc Hexagonal (Ports \& Adapters) và Chiều phụ thuộc Hướng tâm}
+
+Phân hệ \texttt{ai-service} áp dụng \textbf{Clean Architecture} \cite{clean_arch_martin_2017} và \textbf{Ports \& Adapters} để tách logic nghiệp vụ khỏi framework, giao vận và nhà cung cấp mô hình.
+
+Theo quy tắc phụ thuộc hướng tâm, tầng bên trong không phụ thuộc chi tiết cài đặt của tầng bên ngoài. Các tầng chính gồm:
+\begin{enumerate}[nosep]
+  \item \textbf{Tầng Domain (Lõi nghiệp vụ bất biến)}: Nằm tại vị trí trung tâm, chỉ sử dụng thư viện chuẩn của Python (\texttt{dataclasses}, \texttt{enum}, \texttt{typing}, \texttt{decimal}), tuyệt đối không phụ thuộc vào các thư viện bên thứ ba như FastAPI, Pydantic, SQLAlchemy hay mạng HTTP. Tầng này định nghĩa các thực thể và luật nghiệp vụ nền tảng:
+  \begin{itemize}[nosep]
+    \item \texttt{DialogueState} và \texttt{DialoguePatch}: Cấu trúc dữ liệu theo dõi trạng thái hội thoại và các thao tác cập nhật ngữ cảnh (thao tác delta).
+    \item \texttt{EvidenceVerdict}: Bộ phán quyết phân loại độ tin cậy của tài liệu trích xuất (\texttt{KEPT}, \texttt{CONFLICTS}, \texttt{DROPPED}).
+    \item Module \texttt{recommendation}: Hàm \texttt{recommend} xếp hạng các \texttt{TicketOption} theo ngân sách, dùng \texttt{Decimal} để tránh sai số biểu diễn nhị phân của \texttt{float}.
+    \item Luật cứng \textbf{\texttt{READ\_ONLY}}: Ranh giới bất biến quy định phân hệ AI chỉ có quyền tra cứu, không có quyền sửa đổi dữ liệu hệ thống.
+  \end{itemize}
+  \item \textbf{Tầng Application (Use Cases \& Ports)}: \texttt{ChatUseCase} điều phối hội thoại; \texttt{RetrievePolicy} truy xuất chính sách. Các phụ thuộc bên ngoài được khai báo qua cổng \texttt{Protocol}, tách khỏi cách triển khai cụ thể.
+  \item \textbf{Tầng Adapters (Inbound \& Outbound Adapters)}: Chịu trách nhiệm chuyển đổi dữ liệu giữa các giao thức kỹ thuật bên ngoài và các đối tượng nghiệp vụ bên trong:
+  \begin{itemize}[nosep]
+    \item \textit{Inbound Adapters}: Tiếp nhận yêu cầu từ người dùng thông qua API RESTful của FastAPI (\texttt{POST /api/v1/chat}, \texttt{GET /health/live}, \texttt{GET /health/ready}), middleware gắn vết yêu cầu (\texttt{Request-ID}) và thực thi nguyên tắc \textbf{No PII Logging} (tuyệt đối không ghi nhật ký các thông tin định danh cá nhân như số điện thoại, email, thông tin thanh toán).
+    \item \textit{Outbound Adapters}: Hiện thực các cổng NLU, truy hồi tri thức và gateway nghiệp vụ. Baseline dùng luật và BM25; Qwen là adapter tùy chọn, còn ONNX/RRF thuộc thí nghiệm ngoại tuyến.
+  \end{itemize}
+\end{enumerate}
+
+\begin{figure}[!htbp]
+\centering
+\vspace{0.15cm}
+\noindent\makebox[\textwidth][c]{%
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize\linespread{1.05}\selectfont},
+  adapter/.style={rectangle, rounded corners=2pt, draw=black!80, fill=gray!8, thin, align=center, inner sep=5pt},
+  coreouter/.style={rectangle, rounded corners=4pt, draw=black, fill=gray!14, thin, align=center},
+  coreinner/.style={rectangle, rounded corners=3pt, draw=black, fill=white, thick, align=center, inner sep=5.5pt},
+  guard/.style={rectangle, rounded corners=2pt, draw=black!80, dashed, fill=gray!5, thin, align=center, inner sep=5pt}
+]
+  % --- KHỐI GIỮA: LÕI APPLICATION & DOMAIN ---
+  \node[coreinner, minimum width=4.6cm, text width=4.2cm, fill=gray!4, thin] (usecases) at (0, 1.35) {
+    \texttt{ChatService} $\bullet$ \texttt{RetrievePolicy}\\
+    Giao tiếp qua \texttt{Protocol} Ports
+  };
+
+  \node[coreinner, minimum width=4.6cm, text width=4.2cm, below=0.55cm of usecases] (domain_box) {
+    \textbf{Tầng Domain Logic (Lõi Bất biến)}\\[3pt]
+    $\bullet$ \texttt{DialogueState} \& \texttt{StateDelta}\\
+    $\bullet$ \texttt{EvidenceVerdict} (Kiểm chứng nguồn)\\
+    $\bullet$ \texttt{TicketOptimizer} (Toán tử \texttt{Decimal})\\
+    $\bullet$ Luật cứng: \textbf{\texttt{READ\_ONLY}}
+  };
+
+  \node[above=0.15cm of usecases, font=\scriptsize\bfseries] (app_title) {Tầng Application Use Cases \& Ports};
+
+  \begin{scope}[on background layer]
+    \node[coreouter, inner sep=7pt, fit=(app_title) (usecases) (domain_box)] (app_box) {};
+  \end{scope}
+
+  % --- CỘT TRÁI: INBOUND ADAPTERS ---
+  \node[adapter, minimum width=3.1cm, text width=2.8cm] (in_http) at (-4.9, 1.15) {
+    \textbf{Inbound HTTP API}\\[2pt]
+    FastAPI \texttt{POST /api/v1/chat}\\
+    \texttt{GET /health/live, /ready}
+  };
+  \node[adapter, minimum width=3.1cm, text width=2.8cm, below=0.65cm of in_http] (in_mw) {
+    \textbf{Observability \& DTO}\\[2pt]
+    Pydantic v2 Schema\\
+    Request-ID (No PII Log)
+  };
+
+  % --- CỘT PHẢI: 3 OUTBOUND ADAPTERS ---
+  \node[adapter, minimum width=3.1cm, text width=2.8cm] (out_rag) at (4.9, 0.15) {
+    \textbf{2. Knowledge Adapter}\\[2pt]
+    BM25 + ONNX RRF\\
+    \texttt{Qwen2.5-3B} Synthesizer
+  };
+  \node[adapter, minimum width=3.1cm, text width=2.8cm, above=0.55cm of out_rag] (out_nlu) {
+    \textbf{1. NLU Adapter}\\[2pt]
+    \texttt{Qwen2.5-1.5B} QLoRA\\
+    \& \texttt{RuleBasedNLU}
+  };
+  \node[adapter, minimum width=3.1cm, text width=2.8cm, below=0.55cm of out_rag] (out_biz) {
+    \textbf{3. Business Gateway}\\[2pt]
+    Chỉ gọi \texttt{HTTP GET}\\
+    Allowlist Projection
+  };
+
+  % --- THANH KIỂM CHỨNG TĨNH Ở DƯỚI CÙNG ---
+  \node[guard, minimum width=12.6cm, text width=12.2cm, below=0.65cm of app_box] (static_guard) {
+    \textbf{Hàng rào Kiểm chứng Tĩnh \& Cổng Phát hành:} \texttt{static\_verify.py} (Quét AST cấm hàm ghi) $\mid$ \texttt{implementation\_gates.yaml} (Fail-Closed) $\mid$ \texttt{MANIFEST\_SHA256}
+  };
+
+  % --- CÁC MŨI TÊN KẾT NỐI ---
+  \draw[-{Stealth[length=2mm]}, thin] (in_http.east) -- (in_http.east -| app_box.west);
+  \draw[-{Stealth[length=2mm]}, thin] (in_mw.east) -- (in_mw.east -| app_box.west);
+  \draw[-{Stealth[length=2mm]}, thin] (usecases.south) -- (domain_box.north);
+  \draw[-{Stealth[length=2mm]}, thin] (out_nlu.west) -- (out_nlu.west -| app_box.east);
+  \draw[-{Stealth[length=2mm]}, thin] (out_rag.west) -- (out_rag.west -| app_box.east);
+  \draw[-{Stealth[length=2mm]}, thin] (out_biz.west) -- (out_biz.west -| app_box.east);
+  \draw[-{Stealth[length=2mm]}, thin, dashed] (static_guard.north) -- (app_box.south);
+\end{tikzpicture}%
+}
+\vspace{0.1cm}
+\caption{Kiến trúc Hexagonal (Ports \& Adapters) và chiều phụ thuộc hướng tâm tại \texttt{ai-service}}
+\label{fig:clean_architecture_circles}
+\end{figure}
+
+\subsection{Ranh giới An toàn và Nguyên tắc Bất biến \texttt{READ\_ONLY}}
+
+Trong hệ thống bán vé, prompt injection hoặc suy diễn sai có thể khiến mô hình đề xuất hành động vượt quyền hay trả lời sai. Dịch vụ áp dụng giới hạn quyền và nhiều lớp kiểm tra nhằm giảm rủi ro; các lớp này vẫn cần kiểm thử độc lập và không bảo đảm loại bỏ mọi dạng tấn công:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Nguyên tắc bất biến \texttt{READ\_ONLY} tuyệt đối}:
+  Phân hệ AI hoàn toàn không có quyền hạn ghi (write permission) vào hệ thống bán vé. \texttt{ai-service} không sở hữu kết nối trực tiếp đến cơ sở dữ liệu PostgreSQL của backend, không có quyền thực thi bất kỳ câu lệnh SQL nào (\texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE}) và không lưu trữ thông tin xác thực quản trị.
+
+  \item \textbf{Giao tiếp một chiều chỉ dùng \texttt{HTTP GET} theo Allowlist}:
+  Mọi tương tác tra cứu dữ liệu sự kiện giữa \texttt{ai-service} và Backend giao dịch đều được thực hiện thông qua \texttt{Business Gateway} và bị giới hạn ở phương thức \textbf{\texttt{HTTP GET}} trên các đường dẫn đã được đăng ký trước (Named Registry Paths). Mọi phương thức thay đổi trạng thái (\texttt{POST}, \texttt{PUT}, \texttt{DELETE}, \texttt{PATCH}) hoặc các URL tùy biến nằm ngoài danh mục đều bị chặn ngay tại tầng Adapter.
+
+  \item \textbf{Phép chiếu an toàn danh sách cho phép (Allowlist Projection)}:
+  Khi nhận phản hồi JSON từ Backend, hệ thống không bao giờ truyền nguyên văn dữ liệu thô vào ngữ cảnh của mô hình ngôn ngữ. Thay vào đó, dữ liệu được trích xuất qua bộ lọc chiếu (Allowlist Projection), chỉ giữ lại các trường thông tin sự kiện công khai (tên sự kiện, địa điểm, thời gian, tên hạng vé, giá niêm yết, số lượng vé còn khả dụng). Các trường dữ liệu nhạy cảm như mã QR vé, mã token xác thực, thông tin khách hàng khác hoặc cấu trúc bảng cơ sở dữ liệu nội bộ đều bị triệt tiêu hoàn toàn trước khi đưa vào mô hình AI.
+
+  \item \textbf{Hàng rào kiểm chứng tĩnh (Static Verification) và Cổng phát hành}:
+  Hệ thống dùng kiểm tra tự động để phát hiện một số vi phạm kiến trúc và quyền:
+  \begin{itemize}[nosep]
+    \item Kịch bản \texttt{static\_verify.py} phân tích cây cú pháp trừu tượng (AST) để phát hiện phụ thuộc và lời gọi thuộc danh sách cấm; kiểm tra tĩnh không bao phủ mọi hành vi thời gian chạy.
+    \item Các cổng phát hành yêu cầu kiểm thử, kiểm tra kiểu, lint và đối chiếu manifest. Mục tiêu coverage $\ge 90\%$ là ngưỡng của dự án, không phải chứng nhận an toàn; chưa có kết quả coverage đầy đủ cho phiên bản hiện hành.
+  \end{itemize}
+\end{enumerate}
+
+\section{Hệ thống hội thoại hướng tác vụ (Task-Oriented Dialogue System)}
+\label{sec:theory_tods}
+
+\subsection{Mô hình hóa bài toán NLU đa lượt bằng cấu trúc JSON}
+
+Khác với chatbot trò chuyện tự do, trợ lý ảo đặt vé thuộc nhóm \textbf{Hệ thống hội thoại hướng tác vụ (TODS)}. Tại lượt hội thoại thứ $t$, đầu vào của mô hình NLU gồm câu nói hiện tại của người dùng $u_t$ và trạng thái ngữ cảnh đã lưu ở lượt trước $S_{t-1}$. Mô hình cần phân tích và trả về đồng thời 4 thành phần trong một đối tượng JSON:
+\begin{equation}
+  f_{\text{NLU}}(u_t, S_{t-1}) = \big( I_t,\; E_t,\; \Delta S_t,\; A_t \big)
+  \label{eq:nlu_formulation}
+\end{equation}
+Trong đó:
+\begin{itemize}[nosep]
+  \item $I_t$ (\texttt{primary\_intent}): Ý định chính của khách hàng (21 nhãn trong đặc tả v1.2; runtime dùng tập nhãn được hỗ trợ).
+  \item $E_t$ (\texttt{entities}): Các thông tin chi tiết bóc tách được từ câu nói và đã được chuẩn hóa (ví dụ khách gõ \textit{``Sài Gòn''} thì chuẩn hóa thành \texttt{city = "TP Hồ Chí Minh"}, gõ \textit{``2 củ''} thì chuẩn hóa thành \texttt{budget\_amount = 2000000}).
+  \item $\Delta S_t$ (\texttt{state\_delta}): Danh sách các thao tác cập nhật trạng thái hội thoại từ lượt cũ sang lượt mới.
+  \item $A_t$ (\texttt{proposed\_action}): Hành động đề xuất trong tập 19 nhãn v1.2; ứng dụng kiểm tra hợp đồng và quyền trước khi điều phối.
+\end{itemize}
+
+\subsection{Theo dõi trạng thái hội thoại bằng toán tử \texttt{state\_delta}}
+
+Khách có thể hỏi \textit{``Tìm đêm nhạc ở Hà Nội''} rồi đổi sang \textit{``Đà Nẵng, 2 vé dưới 1 triệu''}. Đặc tả v1.2 đề xuất 6 phép toán: \texttt{SET}, \texttt{REMOVE}, \texttt{ADD}, \texttt{CLEAR}, \texttt{REFER} và \texttt{SWITCH\_TASK}. Hợp đồng runtime hiện hỗ trợ \texttt{SET}, \texttt{REMOVE}, \texttt{CLEAR}; không thực thi trực tiếp các phép toán còn lại. Quy tắc giữ hoặc thay giá trị khe thông tin được minh họa như sau:
+\begin{equation}
+  S_t(s) = \begin{cases}
+    v & \text{nếu } (\texttt{SET}, s, v) \in \Delta S_t \\
+    \varnothing & \text{nếu } (\texttt{REMOVE}, s, \cdot) \in \Delta S_t \text{ hoặc } (\texttt{CLEAR}, \text{all}, \cdot) \in \Delta S_t \\
+    S_{t-1}(s) & \text{nếu khe thông tin } s \text{ không bị thay đổi ở lượt hiện tại}
+  \end{cases}
+  \label{eq:state_delta_transition}
+\end{equation}
+
+\section{Mô hình ngôn ngữ nhỏ Qwen2.5 và kỹ thuật tinh chỉnh QLoRA}
+\label{sec:theory_qwen_qlora}
+
+\subsection{Lý do lựa chọn dòng mô hình Qwen2.5-Instruct (1.5B và 3B)}
+
+Nhóm lựa chọn \texttt{Qwen2.5-1.5B-Instruct} và \texttt{Qwen2.5-3B-Instruct} \cite{qwen25_2024} để nghiên cứu sinh JSON NLU và tổng hợp câu trả lời có nguồn. Các đặc điểm kiến trúc liên quan gồm:
+\begin{enumerate}[nosep]
+  \item \textbf{Grouped-Query Attention (GQA)}: Gom nhóm các đầu truy vấn (Query heads) dùng chung khóa và giá trị (Key/Value heads), giúp giảm đáng kể lượng VRAM tiêu thụ của bộ nhớ đệm KV Cache khi xử lý văn bản dài:
+  \begin{equation}
+    \text{Attention}(Q_i, K_{g(i)}, V_{g(i)}) = \text{softmax}\!\left(\frac{Q_i K_{g(i)}^\top}{\sqrt{d_k}} + M\right) V_{g(i)}
+    \label{eq:gqa_attention}
+  \end{equation}
+  \item \textbf{Hàm kích hoạt SwiGLU và chuẩn hóa RMSNorm}: Giúp quá trình lan truyền đạo hàm ổn định và hội tụ nhanh hơn khi tinh chỉnh:
+  \begin{equation}
+  \begin{aligned}
+    \text{FFN}_{\text{SwiGLU}}(x) &= \Big( \text{Swish}_{\beta}(x W_{\text{gate}}) \odot (x W_{\text{up}}) \Big) W_{\text{down}} \\[4pt]
+    \text{RMSNorm}(\mathbf{x}) &= \frac{\mathbf{x}}{\sqrt{\frac{1}{d}\sum_{i=1}^d x_i^2 + \epsilon}} \odot \boldsymbol{\gamma}
+  \end{aligned}
+  \label{eq:swiglu_rmsnorm}
+  \end{equation}
+  \item \textbf{Tokenizer hỗ trợ văn bản đa ngôn ngữ và JSON}: Số token phụ thuộc nội dung và phiên bản tokenizer; cần đếm trên dữ liệu thực tế để đặt giới hạn đầu vào, thay vì giả định một tỷ lệ token/từ cố định.
+\end{enumerate}
+
+Trong quá trình huấn luyện có giám sát (SFT) theo định dạng ChatML (\texttt{system}, \texttt{user}, \texttt{assistant}), hàm mất mát Cross-Entropy chỉ tính trên chuỗi token phản hồi $Y = (y_1, \dots, y_T)$ của vai trò \texttt{assistant}:
+\begin{equation}
+  \mathcal{L}_{\text{SFT}}(\Theta) = -\frac{1}{T} \sum_{t=1}^{T} \log P_{\Theta}\!\left(y_t \;\middle|\; x_1, \dots, x_m, y_1, \dots, y_{t-1}\right)
+  \label{eq:sft_loss}
+\end{equation}
+
+\subsection{Nguyên lý tinh chỉnh QLoRA 4-bit NormalFloat (NF4)}
+
+Để giảm nhu cầu bộ nhớ khi tinh chỉnh trên GPU Tesla T4, nhóm dùng \textbf{QLoRA} \cite{qlora_dettmers_2023}, kết hợp lượng tử hóa 4-bit với nhánh thích nghi hạng thấp LoRA \cite{lora_hu_2022}. Hình~\ref{fig:qlora_architecture} minh họa cơ chế này:
+
+\begin{figure}[!htbp]
+\centering
+\vspace{0.15cm}
+\noindent\makebox[\textwidth][c]{%
+\begin{tikzpicture}[
+  every node/.style={font=\footnotesize\linespread{1.05}\selectfont},
+  box/.style={rectangle, rounded corners=2pt, draw=black!80, thin, align=center, inner sep=6pt}
+]
+  % Hai nhánh trái - phải cách nhau rõ ràng
+  \node[box, fill=gray!15, minimum width=4.6cm, text width=4.2cm] (frozen) at (-3.2, 0) {
+    \textbf{Trọng số gốc $W_0^{\text{NF4}}$}\\[2pt]
+    Đóng băng ở dạng 4-bit\\
+    $W_0 \in \mathbb{R}^{d_{\text{in}} \times d_{\text{out}}}$
+  };
+
+  \node[box, fill=white, minimum width=4.4cm, text width=4.0cm] (lora_a) at (3.2, -0.75) {
+    Ma trận LoRA $A \in \mathbb{R}^{d_{\text{in}} \times r}$
+  };
+
+  \node[box, fill=white, minimum width=4.4cm, text width=4.0cm, above=0.55cm of lora_a] (lora_b) {
+    Ma trận LoRA $B \in \mathbb{R}^{r \times d_{\text{out}}}$
+  };
+
+  % Khối đầu vào ở dưới
+  \node[box, fill=gray!10, minimum width=10.8cm] (x_in) at (0, -2.35) {
+    Vector biểu diễn đầu vào $x \in \mathbb{R}^{1 \times d_{\text{in}}}$
+  };
+
+  % Nút cộng và đầu ra ở trên
+  \node[circle, draw=black, thin, fill=white, inner sep=2.5pt] (plus) at (0, 1.95) {$+$};
+
+  \node[box, fill=gray!10, minimum width=10.8cm] (h_out) at (0, 3.05) {
+    Vector đầu ra $h = x \cdot \text{dequant}(W_0^{\text{NF4}}) + \frac{\alpha}{r} x A B \in \mathbb{R}^{1 \times d_{\text{out}}}$
+  };
+
+  % Mũi tên kết nối chuẩn xác
+  \draw[-{Stealth[length=2mm]}, thin] (x_in.north -| frozen.south) -- (frozen.south);
+  \draw[-{Stealth[length=2mm]}, thin] (x_in.north -| lora_a.south) -- (lora_a.south);
+  \draw[-{Stealth[length=2mm]}, thin] (lora_a.north) -- node[right, font=\scriptsize] {$r=16$} (lora_b.south);
+  \draw[-{Stealth[length=2mm]}, thin] (frozen.north) |- (plus.west);
+  \draw[-{Stealth[length=2mm]}, thin] (lora_b.north) |- node[pos=0.75, above, font=\scriptsize] {$\times \frac{\alpha}{r}$} (plus.east);
+  \draw[-{Stealth[length=2mm]}, thin] (plus.north) -- (h_out.south);
+\end{tikzpicture}%
+}
+\vspace{0.1cm}
+\caption{Cơ chế đóng băng trọng số gốc 4-bit NF4 và chỉ huấn luyện hai ma trận nhỏ $A, B$ trong QLoRA}
+\label{fig:qlora_architecture}
+\end{figure}
+
+Trong QLoRA, đối với mỗi lớp biến đổi tuyến tính có trọng số gốc $W_0 \in \mathbb{R}^{d_{\text{in}} \times d_{\text{out}}}$, ma trận $W_0$ được nén xuống 4-bit NormalFloat ($W_0^{\text{NF4}}$) kèm lượng tử hóa kép (Double Quantization) và giữ cố định. Nhóm gắn thêm cặp ma trận thích nghi hạng thấp $A \in \mathbb{R}^{d_{\text{in}} \times r}$ và $B \in \mathbb{R}^{r \times d_{\text{out}}}$ với hạng $r = 16 \ll \min(d_{\text{in}}, d_{\text{out}})$ vào toàn bộ 7 lớp chiếu (\texttt{q\_proj}, \texttt{k\_proj}, \texttt{v\_proj}, \texttt{o\_proj}, \texttt{gate\_proj}, \texttt{up\_proj}, \texttt{down\_proj}). Kích thước đầu vào và đầu ra phụ thuộc từng lớp chiếu; không giả định các lớp Query, Key và Value của GQA có cùng kích thước đầu ra. Với vector hàng đầu vào $x \in \mathbb{R}^{1 \times d_{\text{in}}}$, công thức tính toán ở lượt truyền thẳng là:
+\begin{equation}
+  h = x W_0 + x \Delta W = x \cdot \text{dequant}_{\text{FP16}}\!\left(W_0^{\text{NF4}}\right) + \frac{\alpha}{r} x A B
+  \label{eq:qlora_forward}
+\end{equation}
+Một kinh nghiệm thực tế rất quan trọng mà nhóm rút ra khi làm việc với GPU Tesla T4 trên Kaggle là: GPU T4 thuộc kiến trúc Turing (Compute Capability 7.5), không hỗ trợ tính toán nhân ma trận phần cứng với kiểu dữ liệu \texttt{bfloat16}. Do đó, toàn bộ quá trình giải nén tính toán phải được ép sang kiểu \texttt{float16} (\texttt{torch.float16}).
+
+\subsection{Nguyên tắc phân tách tập dữ liệu chống rò rỉ tri thức (Zero Data Leakage)}
+
+Khi xây dựng tập dữ liệu huấn luyện và kiểm định đối thoại đa lượt cho mô hình ngôn ngữ nhỏ, phương pháp phân chia dữ liệu giữ vai trò then chốt trong việc đánh giá đúng năng lực tổng quát hóa. Nếu lấy mẫu ngẫu nhiên độc lập từng câu đối thoại đơn lẻ vào tập huấn luyện ($\mathcal{D}_{\text{train}}$) và tập kiểm định ($\mathcal{D}_{\text{val}}$), các câu có cùng ngữ cảnh hội thoại hoặc cùng mẫu câu hỏi tương đồng sẽ xuất hiện ở cả hai tập. Hiện tượng này dẫn tới rò rỉ thông tin (Data Leakage), làm cho độ chính xác trên tập kiểm định đạt mức cao ảo nhưng mô hình lại hoạt động kém khi gặp người dùng thực tế.
+
+Nhóm phân vùng theo \textbf{họ kịch bản gốc (\texttt{scenario\_family})}: các lượt và biến thể cùng họ phải nằm trong một tập. Điều kiện không giao nhau theo định danh họ là:
+\begin{equation}
+  \mathcal{F}(\mathcal{D}_{\text{train}}) \cap \mathcal{F}(\mathcal{D}_{\text{val}}) = \varnothing
+  \label{eq:zero_leakage_condition}
+\end{equation}
+Trong đó $\mathcal{F}(\mathcal{D})$ là tập định danh họ kịch bản. Điều kiện này chỉ loại giao nhau theo định danh đã gán; vẫn phải kiểm tra các họ có nội dung gần trùng, tính đúng của nhãn và việc sử dụng tập test. Không suy ra mọi tình huống validation đều mới về ngữ nghĩa.
+
+\section{Hệ thống truy hồi tăng cường sinh văn bản lai ghép (Hybrid RAG)}
+\label{sec:theory_hybrid_rag}
+
+\subsection{Lý thuyết Truy hồi thông tin: Biểu diễn thưa so với Biểu diễn đặc}
+
+Trong các hệ thống trợ lý ảo phục vụ bán vé sự kiện, mô hình ngôn ngữ cần trả lời chính xác các câu hỏi liên quan đến chính sách và điều khoản nghiệp vụ (như điều kiện hoàn hủy vé, thời gian giữ chỗ thanh toán 10 phút, quy định độ tuổi khán giả, quyền lợi hạng vé VIP). Nếu phụ thuộc hoàn toàn vào tri thức nội tại đã được ghi nhớ trong trọng số của LLM, hệ thống rất dễ gặp hiện tượng sinh ảo (Hallucination) hoặc không cập nhật kịp thời khi quy chế thay đổi. Do đó, giải pháp tối ưu là áp dụng kiến trúc \textbf{Truy hồi tăng cường sinh văn bản (Retrieval-Augmented Generation -- RAG)} \cite{rag_lewis_2020}.
+
+Bản chất của bài toán Truy hồi thông tin (Information Retrieval -- IR) trong RAG là tìm kiếm một tập hợp con $k$ tài liệu liên quan nhất $\mathcal{D}^* = \{d_1, \dots, d_k\} \subset \mathcal{C}$ từ kho ngữ liệu quy chế $\mathcal{C}$ để trả lời cho truy vấn $Q$ của người dùng:
+\begin{equation}
+  \mathcal{D}^* = \arg\max_{\mathcal{D}' \subset \mathcal{C}, |\mathcal{D}'|=k} \sum_{d \in \mathcal{D}'} \mathcal{S}(Q, d)
+  \label{eq:ir_objective}
+\end{equation}
+Trong đó $\mathcal{S}(Q, d)$ là hàm đo lường mức độ tương đồng giữa câu hỏi và đoạn trích tài liệu. Trong lĩnh vực IR hiện đại, có hai trường phái biểu diễn văn bản chủ đạo:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Biểu diễn thưa (Sparse / Lexical Representation)}:
+  Mỗi tài liệu $d$ và truy vấn $Q$ được ánh xạ thành một vector thưa $\mathbf{v} \in \mathbb{R}^{|V|}$ trong không gian từ vựng có số chiều rất lớn ($|V| \sim 10^4 - 10^6$), trong đó phần lớn các chiều nhận giá trị 0. Trọng số tại mỗi chiều được xác định thông qua tần suất xuất hiện của từ (TF) kết hợp với nghịch đảo tần suất tài liệu (IDF).
+  \begin{itemize}[nosep]
+    \item \textit{Ưu điểm}: Tốc độ truy vấn cực nhanh nhờ cấu trúc chỉ mục đảo (Inverted Index); khả năng ưu tiên từ khóa trùng sau bước chuẩn hóa (lexical matching), đặc biệt nhạy bén với mã định danh quy định (như \texttt{"SE-POL-01"}), các con số cụ thể (\texttt{"200.000 VNĐ"}, \texttt{"10 phút"}), hoặc các thuật ngữ kỹ thuật hiếm gặp.
+    \item \textit{Nhược điểm}: Mắc phải vấn đề từ vựng không khớp (Vocabulary Mismatch Problem) --- nếu người dùng dùng từ đồng nghĩa hoặc cách diễn đạt khác biệt (ví dụ người dùng hỏi \textit{``trả lại vé''} trong khi quy chế dùng từ \textit{``hoàn vé''}), biểu diễn thưa có thể bỏ sót tài liệu phù hợp khi thiếu từ chung.
+  \end{itemize}
+
+  \item \textbf{Biểu diễn đặc (Dense / Semantic Representation)}:
+  Sử dụng các mạng nơ-ron học sâu (thường là kiến trúc Transformer Bi-encoder) để mã hóa toàn bộ ngữ cảnh văn bản thành một vector đặc (dense vector) trong không gian liên tục có số chiều cố định và thấp hơn rất nhiều ($d \ll |V|$, thường là $d = 384$).
+  \begin{itemize}[nosep]
+    \item \textit{Ưu điểm}: Nắm bắt trọn vẹn ngữ nghĩa tiềm ẩn (latent semantics), hiểu được các câu hỏi diễn giải tương đương (paraphrasing), từ đồng nghĩa và mối quan hệ ngữ cảnh sâu sắc mà không yêu cầu trùng lặp từ vựng.
+    \item \textit{Nhược điểm}: Dễ gặp hiện tượng suy diễn nhầm lẫn khi gặp các con số cụ thể, ngày tháng hoặc các mã văn bản chuyên biệt; đòi hỏi chi phí tính toán mạng nơ-ron lớn hơn so với tra cứu từ khóa thưa.
+  \end{itemize}
+\end{enumerate}
+
+Bảng~\ref{tab:sparse_vs_dense_comparison} tóm tắt khả năng bổ trợ giữa hai phương pháp. Đồ án nghiên cứu \textbf{Hybrid RAG} để kết hợp hai nhánh; lợi ích thực tế cần được đo trên cùng tập câu hỏi.
+
+\begin{table}[!htbp]
+\centering
+\small
+\caption{So sánh đặc tính kỹ thuật giữa Biểu diễn thưa và Biểu diễn đặc trong Truy hồi thông tin}
+\label{tab:sparse_vs_dense_comparison}
+\begin{tabularx}{\textwidth}{L{3.2cm} X X}
+\toprule
+\textbf{Tiêu chí so sánh} & \textbf{Biểu diễn thưa (Sparse / Lexical)} & \textbf{Biểu diễn đặc (Dense / Semantic)} \\
+\midrule
+Không gian biểu diễn & Rất lớn, số chiều bằng từ điển ($|V| \ge 10^5$), phần lớn giá trị bằng 0 & Chiều cố định và thấp ($d = 384$), toàn bộ giá trị thực liên tục \\
+Cấu trúc tra cứu & Chỉ mục đảo (Inverted Index) & Cây phân cấp hoặc tích vô hướng song song (SIMD) \\
+Khớp từ chính xác & Cực kỳ nhạy bén với mã quy chế, số tiền, mốc thời gian & Có thể bỏ sót hoặc nhầm lẫn giữa các con số khác nhau \\
+Nắm bắt ngữ nghĩa & Kém, dễ thất bại trước từ đồng nghĩa (Vocabulary Mismatch) & Xuất sắc, nắm bắt ngữ cảnh, từ đồng nghĩa và sắc thái câu \\
+Khả năng giải thích & Cao, dễ dàng truy vết điểm số theo từng từ khóa xuất hiện & Khó giải thích chi tiết vì dựa trên không gian tiềm ẩn nơ-ron \\
+Chi phí tính toán & Rất thấp, tối ưu hóa CPU cao & Đòi hỏi tính toán mô hình ngôn ngữ Transformer \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Bản chất toán học của thuật toán truy hồi từ khóa Okapi BM25}
+
+Thuật toán \textbf{Okapi BM25} \cite{bm25_robertson_2009} là một trong những chuẩn mực kinh điển và hiệu quả nhất của trường phái biểu diễn thưa, được xây dựng dựa trên khung xác suất 2-Poisson. Đối với truy vấn $Q$ gồm các từ tố $\{q_1, q_2, \dots, q_m\}$ và tài liệu $d$, điểm số khớp từ vựng được tính theo công thức:
+\begin{equation}
+  \text{Score}_{\text{BM25}}(Q, d) = \sum_{q_i \in Q} \text{IDF}(q_i) \cdot \frac{f(q_i, d) \cdot (k_1 + 1)}{f(q_i, d) + k_1 \cdot \left(1 - b + b \cdot \frac{|d|}{\text{avgdl}}\right)}
+  \label{eq:bm25_formula}
+\end{equation}
+Trong đó:
+\begin{itemize}[nosep]
+  \item $f(q_i, d)$ là tần suất xuất hiện của từ tố $q_i$ trong tài liệu $d$.
+  \item $|d|$ là độ dài thực tế của tài liệu $d$ (tính theo số từ tố), và $\text{avgdl}$ là độ dài trung bình của các tài liệu trong toàn bộ kho tri thức $\mathcal{C}$.
+  \item $\text{IDF}(q_i)$ là đại lượng nghịch đảo tần suất tài liệu, phản ánh lượng thông tin và tính phân biệt của từ tố $q_i$:
+  \begin{equation}
+    \text{IDF}(q_i) = \ln \left( \frac{N - n(q_i) + 0{,}5}{n(q_i) + 0{,}5} + 1 \right)
+    \label{eq:bm25_idf}
+  \end{equation}
+  với $N$ là tổng số tài liệu trong kho ngữ liệu và $n(q_i)$ là số tài liệu có chứa từ tố $q_i$. Nếu từ $q_i$ xuất hiện trong hầu hết các văn bản ($n(q_i) \approx N$), đại lượng bên trong hàm logarit tiến dần về 1 khiến $\text{IDF}(q_i) \approx 0$, loại trừ ảnh hưởng của các từ chung chung. Ngược lại, những từ hiếm ($n(q_i) \ll N$) sẽ nhận giá trị IDF rất cao.
+\end{itemize}
+
+Bản chất toán học ưu việt của BM25 so với phương pháp TF-IDF cổ điển nằm ở hai cơ chế điều phối:
+\begin{enumerate}[nosep]
+  \item \textbf{Cơ chế bão hòa tần suất từ (Term Frequency Saturation) qua tham số $k_1$}:
+  Trong TF-IDF truyền thống, khi một từ khóa xuất hiện lặp lại liên tục, điểm số tăng tuyến tính hoặc logarithmic không chặn, dẫn tới việc một đoạn văn bản cố tình lặp lại từ khóa sẽ nhận điểm cao bất thường. Trong BM25, hàm thành phần tần suất từ được chặn trên bởi một tiệm cận:
+  \begin{equation}
+    \lim_{f(q_i, d) \to \infty} \frac{f(q_i, d) \cdot (k_1 + 1)}{f(q_i, d) + K} = k_1 + 1 \qquad \left(\text{với } K = k_1 \left(1 - b + b \cdot \frac{|d|}{\text{avgdl}}\right)\right)
+    \label{eq:bm25_saturation_limit}
+  \end{equation}
+  Tham số $k_1$ điều khiển độ bão hòa theo tần suất. Với $k_1=0$, các từ đã xuất hiện có cùng hệ số tần suất; $k_1$ lớn làm bão hòa chậm hơn. Công thức trong \texttt{lexical\_reader.py} dùng $k_1=1{,}2$, $b=0{,}75$; hệ số $2{,}2$ ở tử số chính là $k_1+1$, không phải giá trị $k_1$. Việc chọn tham số tối ưu cần một tập hiệu chuẩn riêng.
+
+  \item \textbf{Cơ chế chuẩn hóa độ dài văn bản (Length Normalization) qua tham số $b$}:
+  Các đoạn văn bản dài có xu hướng tự nhiên chứa nhiều từ khóa hơn đơn thuần do độ dài. Tỷ số $\frac{|d|}{\text{avgdl}}$ đo lường độ dài tương đối của văn bản so với mức trung bình của kho ngữ liệu. Tham số $b \in [0, 1]$ kiểm soát mức độ phạt độ dài:
+  \begin{itemize}[nosep]
+    \item Khi $b = 0$: mẫu số mất đi đại lượng điều chỉnh độ dài, hệ thống không áp dụng bất kỳ hình phạt nào đối với văn bản dài.
+    \item Khi $b = 1$: độ dài văn bản bị chuẩn hóa hoàn toàn theo tỷ lệ thuận.
+  \end{itemize}
+  Với cấu hình chuẩn \textbf{$b = 0{,}75$}, khi một tài liệu dài hơn mức trung bình ($|d| > \text{avgdl}$), mẫu số tăng lên làm điểm số của từng lần xuất hiện từ khóa bị giảm nhẹ. Điều này triệt tiêu lợi thế ngẫu nhiên của các tài liệu dài và bảo vệ tính cạnh tranh công bằng cho các điều khoản ngắn gọn, súc tích.
+\end{enumerate}
+
+Bên cạnh đó, module \texttt{lexical\_reader.py} còn thực hiện chuẩn hóa ký tự Unicode theo dạng NFD, loại bỏ 41 từ dừng (stop words) tiếng Việt, và đặt điều kiện tiên quyết: đoạn văn bản bắt buộc phải chứa ít nhất 50\% số lượng từ khóa truy vấn thì mới được đưa vào tính điểm BM25.
+
+\subsection{Cơ sở toán học của Biểu diễn ngữ nghĩa đặc (Dense Semantic Embedding)}
+
+Nhánh tìm kiếm ngữ nghĩa đặc được xây dựng dựa trên mô hình ngôn ngữ nén (Sentence Transformer) chạy suy luận ngoại tuyến dưới định dạng ONNX Runtime. Các khía cạnh toán học nền tảng bao gồm:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Kiến trúc Bi-encoder và khả năng tính toán bất đối xứng}:
+  Thay vì sử dụng mô hình Cross-Encoder (nhận đồng thời cả truy vấn và tài liệu qua toàn bộ các lớp Transformer, có độ phức tạp tính toán $O(N \cdot L^2)$ rất chậm), kiến trúc Bi-encoder sử dụng mạng nơ-ron để ánh xạ truy vấn $Q$ và từng tài liệu $d$ thành các vector độc lập:
+  \begin{equation}
+    \mathbf{u}_Q = \mathcal{E}(Q) \in \mathbb{R}^d, \qquad \mathbf{u}_d = \mathcal{E}(d) \in \mathbb{R}^d
+    \label{eq:bi_encoder_mapping}
+  \end{equation}
+  Ưu điểm vượt trội của Bi-encoder là toàn bộ tài liệu quy chế $\mathcal{C}$ được tính toán vector và lập chỉ mục trước một lần duy nhất (offline indexing). Khi có yêu cầu tra cứu thời gian thực, hệ thống chỉ cần tính toán vector truy vấn một lần duy nhất, sau đó thực hiện phép nhân ma trận song song trên CPU.
+
+  \item \textbf{Cơ chế nhúng bất đối xứng (Asymmetric Embedding Prefixing)}:
+  Trong các bài toán hỏi đáp quy định, câu hỏi của người dùng và đoạn văn bản tài liệu có cấu trúc ngữ pháp và sắc thái biểu đạt rất khác nhau: câu hỏi thường ngắn, mang tính tìm kiếm nghi vấn; trong khi đoạn văn chính sách dài, mang tính khẳng định và giải thích. Kế thừa kiến trúc từ họ mô hình E5, hệ thống áp dụng cơ chế thêm tiền tố định hướng:
+  \begin{equation}
+    Q' = \text{\ttfamily query:\ } \mathbin{\Vert} Q, \qquad d' = \text{\ttfamily passage:\ } \mathbin{\Vert} d
+    \label{eq:asymmetric_prefix}
+  \end{equation}
+  Tiền tố này đóng vai trò như một cờ chỉ thị trong không gian tiềm ẩn, điều hướng các trọng số tự chú ý (Self-Attention) để kéo các cặp câu hỏi -- đoạn văn tương thích lại gần nhau hơn trong không gian vector.
+
+  \item \textbf{Kỹ thuật Attention Mask Mean Pooling so với CLS Token}:
+  Sau khi chuỗi token đi qua lớp Transformer cuối cùng, ta thu được chuỗi các vector trạng thái ẩn $\mathbf{H} = (\mathbf{h}_1, \mathbf{h}_2, \dots, \mathbf{h}_L) \in \mathbb{R}^{L \times d}$ cùng mặt nạ chú ý nhị phân $\mathbf{m} = (m_1, m_2, \dots, m_L) \in \{0, 1\}^L$ (với $m_i = 1$ cho token nội dung và $m_i = 0$ cho token đệm \texttt{[PAD]}). Kỹ thuật \textbf{Attention Mask Mean Pooling} tính giá trị vector đại diện bằng trung bình có trọng số theo mặt nạ:
+  \begin{equation}
+    \mathbf{u} = \frac{\sum_{i=1}^{L} m_i \cdot \mathbf{h}_i}{\sum_{i=1}^{L} m_i} \in \mathbb{R}^d
+    \label{eq:mean_pooling_formula}
+  \end{equation}
+  So với phương pháp chỉ lấy vector của token đầu tiên $\mathbf{h}_{\text{CLS}}$ (vốn dễ bị thiên lệch về các tác vụ phân loại câu), phép lấy trung bình trên toàn bộ token nội dung giúp bảo toàn thông tin ngữ nghĩa đồng đều của toàn bộ đoạn văn bản.
+
+  \item \textbf{Phép chiếu vector lên siêu cầu đơn vị qua Chuẩn hóa L2 (L2 Normalization)}:
+  Để đo lường mức độ tương đồng ngữ nghĩa, độ tương đồng Cosine giữa hai vector $\mathbf{u}_Q$ và $\mathbf{u}_d$ được định nghĩa:
+  \begin{equation}
+    \cos(\theta) = \frac{\mathbf{u}_Q \cdot \mathbf{u}_d}{\|\mathbf{u}_Q\|_2 \cdot \|\mathbf{u}_d\|_2} = \frac{\sum_{j=1}^{d} u_{Q, j} \cdot u_{d, j}}{\sqrt{\sum_{j=1}^{d} u_{Q, j}^2} \cdot \sqrt{\sum_{j=1}^{d} u_{d, j}^2}}
+    \label{eq:cosine_formula}
+  \end{equation}
+  Chuẩn hóa L2 sau Mean Pooling đưa các vector khác không lên siêu cầu đơn vị $\mathbb{S}^{d-1}$, giúp tính Cosine bằng tích vô hướng:
+  \begin{equation}
+    \mathbf{e} = \frac{\mathbf{u}}{\|\mathbf{u}\|_2} \quad \Longrightarrow \quad \|\mathbf{e}\|_2 = \sqrt{\sum_{j=1}^{d} e_j^2} = 1
+    \label{eq:l2_normalization}
+  \end{equation}
+  Khi $\|\mathbf{e}_Q\|_2 = 1$ và $\|\mathbf{e}_d\|_2 = 1$, độ tương đồng Cosine đồng nhất tuyệt đối với phép nhân tích vô hướng (Dot Product):
+  \begin{equation}
+    \text{sim}(Q, d) = \langle \mathbf{e}_Q, \mathbf{e}_d \rangle = \mathbf{e}_Q^\top \mathbf{e}_d = \cos(\theta)
+    \label{eq:dot_product_equivalence}
+  \end{equation}
+  Nhờ tính chất này, quá trình so khớp độ tương đồng ngữ nghĩa trên không gian $d = 384$ chiều được thực thi cực kỳ nhanh chóng thông qua các tập lệnh vector hóa SIMD của CPU trong ONNX Runtime (\texttt{CPUExecutionProvider}). Toàn vẹn của file mô hình ONNX được kiểm tra nghiêm ngặt bằng mã băm SHA-256 trước khi nạp vào bộ nhớ.
+\end{enumerate}
+
+\subsection{Cơ sở lý thuyết của Thuật toán Hợp nhất Thứ hạng Nghịch đảo (RRF)}
+
+Khi sở hữu hai danh sách xếp hạng tài liệu từ hai nhánh độc lập (nhánh từ khóa BM25 và nhánh ngữ nghĩa ONNX Dense), thách thức lớn nhất là làm thế nào để gộp hai kết quả thành một bảng xếp hạng duy nhất tối ưu.
+
+\subsubsection{Vấn đề phân phối điểm số dị biệt (Score Incompatibility Problem)}
+
+Điểm số từ hai mô hình tìm kiếm có bản chất toán học và miền giá trị hoàn toàn khác biệt:
+\begin{itemize}[nosep]
+  \item Điểm BM25 $\text{Score}_{\text{BM25}}(Q, d) \in [0, +\infty)$ là đại lượng không có cận trên, phụ thuộc vào số lượng từ khóa và độ dài câu hỏi;
+  \item Điểm tương đồng Cosine của vector đặc nằm trong khoảng $[-1, 1]$ (thực tế phân bố hẹp trong khoảng $[0{,}4; 0{,}9]$).
+\end{itemize}
+Nếu sử dụng phương pháp kết hợp tuyến tính theo điểm số (Score-based Linear Combination) $\text{Score}_{\text{combo}} = \alpha S_{\text{BM25}} + (1-\alpha) S_{\text{Dense}}$, hệ thống buộc phải chuẩn hóa điểm số (ví dụ dùng Min-Max scaling). Tuy nhiên, phép chuẩn hóa điểm rất nhạy cảm với các giá trị ngoại lai (outliers): nếu một đoạn văn bản có điểm BM25 đột biến do xuất hiện nhiều từ khóa trùng lặp, khoảng điểm của các tài liệu khác sẽ bị co cụm về gần 0, làm sai lệch toàn bộ thứ tự. Hơn nữa, phân phối điểm thay đổi theo từng câu hỏi khác nhau, khiến việc cố định trọng số $\alpha$ trở nên thiếu tin cậy.
+
+\subsubsection{Cơ chế hoạt động của thuật toán RRF}
+
+Thuật toán \textbf{Hợp nhất Thứ hạng Nghịch đảo (RRF)} \cite{rrf_cormack_2009} kết hợp \textbf{thứ hạng} thay vì cộng trực tiếp điểm của hai nhánh. Điểm của tài liệu $d$ đối với truy vấn $Q$ là:
+\begin{equation}
+  \text{RRF\_Score}(d \mid Q) = \sum_{m \in M} \frac{w_m}{k_{\text{rrf}} + \text{rank}_m(d)}
+  \label{eq:rrf_formula}
+\end{equation}
+Trong đó $M = \{\text{BM25}, \text{Dense}\}$ là tập hợp các phương pháp tìm kiếm, $\text{rank}_m(d) \in \{1, 2, \dots, K\}$ là vị trí xếp hạng của tài liệu $d$ trong danh sách trả về của phương pháp $m$, $w_m$ là trọng số của nhánh (trong hệ thống nhóm cấu hình cân bằng $w_{\text{sparse}} = w_{\text{dense}} = 1$), và $k_{\text{rrf}}$ là hằng số làm mượt (smoothing parameter).
+
+\subsubsection{Vai trò của hằng số làm mượt $k_{\text{rrf}} = 60$}
+
+Hằng số làm mượt $k_{\text{rrf}}$ đóng vai trò quyết định độ dốc phân rã điểm số theo thứ hạng:
+\begin{itemize}[nosep]
+  \item Nếu $k_{\text{rrf}}=0$, một tài liệu hạng 1 ở một nhánh nhận $1{,}0$ điểm; tài liệu hạng 2 ở cả hai nhánh cũng nhận $0{,}5+0{,}5=1{,}0$, nên hai trường hợp hòa điểm. Tài liệu hạng 3 ở cả hai nhánh nhận khoảng $0{,}667$. Quy tắc phá hòa cần xác định rõ để tái lập thứ hạng.
+  \item Khi thiết lập giá trị chuẩn thực nghiệm \textbf{$k_{\text{rrf}} = 60$} theo đề xuất gốc của Cormack et al. \cite{rrf_cormack_2009}:
+  \begin{itemize}[nosep]
+    \item Hạng 1 nhận điểm: $\frac{1}{60 + 1} = \frac{1}{61} \approx 0{,}01639$.
+    \item Hạng 2 nhận điểm: $\frac{1}{60 + 2} = \frac{1}{62} \approx 0{,}01613$ (độ chênh lệch giảm xuống chỉ còn $\sim 1{,}6\%$).
+    \item Hạng 3 nhận điểm: $\frac{1}{60 + 3} = \frac{1}{63} \approx 0{,}01587$.
+  \end{itemize}
+\end{itemize}
+
+Nhờ đường cong giảm điểm êm dịu này, RRF tạo ra một cơ chế khen thưởng mạnh mẽ cho \textbf{sự đồng thuận đa nguồn (cross-method consensus)}:
+\begin{equation}
+  \begin{aligned}
+    \text{Tài liệu } d_A \text{ (hạng 1 BM25, vắng mặt ở Dense):} &\quad \text{RRF}(d_A) = \frac{1}{60 + 1} \approx 0{,}01639 \\[3pt]
+    \text{Tài liệu } d_B \text{ (hạng 3 ở cả BM25 và Dense):} &\quad \text{RRF}(d_B) = \frac{1}{60 + 3} + \frac{1}{60 + 3} \approx 0{,}03175
+  \end{aligned}
+  \label{eq:rrf_consensus_proof}
+\end{equation}
+Trong ví dụ này, $\text{Score}(d_B) \approx 2 \times \text{Score}(d_A)$ nên $d_B$ xếp trên $d_A$. RRF ưu tiên sự đồng thuận giữa các nhánh nhưng vẫn có thể xếp cao tài liệu không liên quan; cần đánh giá truy hồi và kiểm tra bằng chứng riêng.
+
+Trong hệ thống SmartEvent, mỗi nhánh đóng góp Top-5 kết quả ($K = 5$), gộp lại thành tối đa 10 ứng viên duy nhất, sau đó tính điểm RRF để chọn lọc Top-5 đoạn trích $d^*$ có điểm số cao nhất chuyển tiếp sang các giai đoạn tiếp theo.
+
+\subsection{Kiến trúc Đường ống Hybrid RAG}
+
+Toàn bộ quy trình xử lý từ lúc người dùng đặt câu hỏi tra cứu quy chế đến khi sinh câu trả lời có căn cứ được tổ chức thành một đường ống khép kín, được minh họa chi tiết tại Hình \ref{fig:hybrid_rag_pipeline}.
+
+\begin{figure}[!htbp]
+\centering
+\vspace{0.1cm}
+\noindent\makebox[\textwidth][c]{%
+\begin{tikzpicture}[
+  every node/.style={font=\footnotesize\linespread{1.02}\selectfont},
+  querybox/.style={rectangle, rounded corners=3pt, draw=topborder, fill=topfill!65, line width=0.8pt, align=center, inner sep=4.5pt},
+  bm25box/.style={rectangle, rounded corners=3pt, draw=k1border, fill=k1fill!55, line width=0.8pt, align=center, inner sep=4.5pt},
+  onnxbox/.style={rectangle, rounded corners=3pt, draw=k2border, fill=k2fill!55, line width=0.8pt, align=center, inner sep=4.5pt},
+  rrfbox/.style={rectangle, rounded corners=3pt, draw=k3border, fill=k3fill!55, line width=0.85pt, align=center, inner sep=5pt},
+  gatebox/.style={rectangle, rounded corners=3pt, draw=k1border, fill=k1fill!55, line width=0.8pt, align=center, inner sep=4.5pt},
+  synthbox/.style={rectangle, rounded corners=3pt, draw=k2border, fill=k2fill!55, line width=0.8pt, align=center, inner sep=4.5pt},
+  outputbox/.style={rectangle, rounded corners=3pt, draw=topborder, fill=topfill!65, line width=0.85pt, align=center, inner sep=5pt}
+]
+
+  % 1. Input: Query node (Top)
+  \node[querybox, minimum width=13.0cm, text width=12.6cm] (query) at (0, 0) {
+    \textbf{Truy vấn người dùng $Q$ (User Policy Query)}\\[1.5pt]
+    \scriptsize Đặt câu hỏi quy chế: chính sách hủy/đổi vé, thời gian giữ chỗ 10 phút, ưu đãi Early Bird, soát vé QR...
+  };
+
+  % 2. Dual Branches: BM25 (Left) and ONNX Semantic (Right)
+  \node[bm25box, minimum width=5.8cm, text width=5.4cm, below left=0.55cm and 0.45cm of query.south] (bm25) {
+    \textbf{Nhánh 1: Tìm kiếm Từ khóa BM25}\\[1.5pt]
+    \scriptsize $\bullet$ Đánh giá khớp từ vựng theo TF-IDF (Eq.~\ref{eq:bm25_formula})\\[1pt]
+    $\bullet$ Bắt chính xác mã quy chế, số tiền, điều khoản\\[1pt]
+    $\bullet$ Xuất bảng xếp hạng thưa $\text{rank}_{\text{BM25}}(d)$
+  };
+
+  \node[onnxbox, minimum width=5.8cm, text width=5.4cm, below right=0.55cm and 0.45cm of query.south] (onnx) {
+    \textbf{Nhánh 2: Tìm kiếm Ngữ nghĩa ONNX}\\[1.5pt]
+    \scriptsize $\bullet$ Vector hóa bất đối xứng: tiền tố \texttt{"query:"}/\texttt{"passage:"}\\[1pt]
+    $\bullet$ Pooling attention-mask-mean, chuẩn hóa L2, CPU only\\[1pt]
+    $\bullet$ Vector $\mathbf{e}_Q \in \mathbb{R}^{384}$; tích vô hướng $\langle \mathbf{e}_Q, \mathbf{e}_d \rangle$\\[1pt]
+    $\bullet$ SHA-256 xác minh toàn vẹn file ONNX khi nạp
+  };
+
+  % Midpoint below dual branches
+  \coordinate (mid_branches) at ($(bm25.south)!0.5!(onnx.south)$);
+
+  % 3. Fusion: RRF Reciprocal Rank Fusion node (Center)
+  \node[rrfbox, minimum width=13.0cm, text width=12.6cm, below=0.55cm of mid_branches] (rrf) {
+    \textbf{Hợp nhất Thứ hạng Nghịch đảo RRF (Reciprocal Rank Fusion)}\\[1.5pt]
+    \scriptsize $\text{RRF\_Score}(d \mid Q) = \dfrac{1}{60 + \text{rank}_{\text{BM25}}(d)} + \dfrac{1}{60 + \text{rank}_{\text{ONNX}}(d)}$ \quad ($k_{\text{rrf}}=60$, $w_{\text{sparse}}=w_{\text{dense}}=1$, theo Eq.~\ref{eq:rrf_formula})\\[1.5pt]
+    Mỗi nhánh đóng góp Top-5 kết quả $\rightarrow$ Gộp và chọn lọc Top-5 đoạn trích $d^*$ có điểm số cao nhất
+  };
+
+  % 4. Verification & Synthesis: EvidenceGate (Left) and Qwen2.5-3B PolicySynthesizer (Right)
+  \node[gatebox, minimum width=5.8cm, text width=5.4cm, below left=0.55cm and 0.45cm of rrf.south] (gate) {
+    \textbf{Cổng kiểm chứng Evidence Gate}\\[1.5pt]
+    \scriptsize $\bullet$ Phát hiện prompt injection (regex)\\[1pt]
+    $\bullet$ Phát hiện mâu thuẫn tiền đề (\texttt{CONFLICTS})\\[1pt]
+    $\bullet$ Lọc liên quan: $\ge50\%$ từ khóa truy vấn khớp\\[1pt]
+    $\bullet$ Fail-closed: khi thiếu phán quyết, loại bỏ đoạn trích
+  };
+
+  \node[synthbox, minimum width=5.8cm, text width=5.4cm, below right=0.55cm and 0.45cm of rrf.south] (synth) {
+    \textbf{Tổng hợp câu trả lời (\texttt{PolicySynthesizer})}\\[1.5pt]
+    \scriptsize $\bullet$ Mô hình \textbf{Qwen2.5-3B} (Ollama / PEFT NF4)\\[1pt]
+    $\bullet$ Prompt ép khuôn theo ngữ cảnh đã kiểm chứng $d^*$\\[1pt]
+    $\bullet$ Thiết lập \texttt{temperature = 0.0} chống sinh ảo
+  };
+
+  % Midpoint below lower tier
+  \coordinate (mid_lower) at ($(gate.south)!0.5!(synth.south)$);
+
+  % 5. Output: Verified Grounded Answer node with citation (Bottom)
+  \node[outputbox, minimum width=13.0cm, text width=12.6cm, below=0.55cm of mid_lower] (output) {
+    \textbf{Câu trả lời có căn cứ \& Minh bạch nguồn trích dẫn (Grounded Answer)}\\[1.5pt]
+    \scriptsize $\bullet$ Phản hồi chính xác theo quy chế thực tế, loại trừ triệt để hiện tượng sinh ảo (Hallucination)\\[1pt]
+    $\bullet$ Đính kèm mã định danh nguồn minh bạch: \texttt{[Nguồn: SE-POL-01]}, \texttt{[Nguồn: SE-POL-02]}
+  };
+
+  % Connections:
+  % Query -> Dual Branches
+  \draw[-{Stealth[length=2.2mm]}, line width=0.8pt, color=k1border] (query.south -| bm25.north) -- (bm25.north)
+    node[midway, left=3pt, font=\scriptsize\bfseries, text=k1text] {Phân tích từ vựng};
+
+  \draw[-{Stealth[length=2.2mm]}, line width=0.8pt, color=k2border] (query.south -| onnx.north) -- (onnx.north)
+    node[midway, right=3pt, font=\scriptsize\bfseries, text=k2text] {Trích xuất embedding};
+
+  % Dual Branches -> RRF
+  \draw[-{Stealth[length=2.2mm]}, line width=0.8pt, color=k1border] (bm25.south) -- (bm25.south |- rrf.north)
+    node[midway, left=3pt, font=\scriptsize\bfseries, text=k1text] {Hạng BM25};
+
+  \draw[-{Stealth[length=2.2mm]}, line width=0.8pt, color=k2border] (onnx.south) -- (onnx.south |- rrf.north)
+    node[midway, right=3pt, font=\scriptsize\bfseries, text=k2text] {Hạng ONNX};
+
+  % RRF -> Evidence Gate
+  \draw[-{Stealth[length=2.2mm]}, line width=0.85pt, color=k3border] (rrf.south -| gate.north) -- (gate.north)
+    node[midway, left=3pt, font=\scriptsize\bfseries, text=k3text] {Top-5 đoạn trích $d^*$};
+
+  % Evidence Gate -> PolicySynthesizer
+  \draw[-{Stealth[length=2.2mm]}, line width=0.85pt, color=k2border] (gate.east) -- (synth.west)
+    node[midway, above=1.5pt, font=\tiny\bfseries, text=k2text] {Đạt kiểm chứng};
+
+  % Synthesis -> Output
+  \draw[-{Stealth[length=2.2mm]}, line width=0.85pt, color=k2border] (synth.south) -- (synth.south |- output.north)
+    node[midway, right=3pt, font=\scriptsize\bfseries, text=k2text, align=left] {Phản hồi sinh tự nhiên\\[1pt]{\tiny\mdseries(Mô hình 3B)}};
+
+  % Extractive Fallback link
+  \draw[-{Stealth[length=2.2mm]}, line width=0.85pt, dashed, color=k3border] (gate.south) -- (gate.south |- output.north)
+    node[midway, left=3pt, font=\scriptsize\bfseries, text=k3text, align=right] {Extractive Fallback\\[1pt]{\tiny\mdseries(Dự phòng hạ cấp)}};
+
+\end{tikzpicture}%
+}
+\vspace{0.1cm}
+\caption{Sơ đồ kiến trúc đường ống truy hồi tài liệu lai ghép Hybrid RAG trong \texttt{ai-service}}
+\label{fig:hybrid_rag_pipeline}
+\end{figure}
+
+Luồng xử lý gồm 5 bước tuần tự:
+\begin{enumerate}[nosep]
+  \item \textbf{Tiếp nhận truy vấn $Q$}: Câu hỏi về quy định của người dùng được chuẩn hóa ký tự và loại bỏ khoảng trắng thừa.
+  \item \textbf{Tìm kiếm song song hai nhánh}: Nhánh BM25 tính điểm từ khóa và xuất bảng xếp hạng thưa $\text{rank}_{\text{BM25}}(d)$; đồng thời nhánh ONNX tạo vector nhúng với tiền tố bất đối xứng \texttt{"query: "} và tính tích vô hướng với kho vector tài liệu để xuất bảng xếp hạng đặc $\text{rank}_{\text{ONNX}}(d)$.
+  \item \textbf{Hợp nhất RRF}: Thuật toán RRF với $k_{\text{rrf}} = 60$ gộp Top-5 từ mỗi nhánh, tính điểm hợp nhất và sắp xếp lại để lấy Top-5 đoạn trích có điểm cao nhất $d^*$.
+  \item \textbf{Kiểm chứng an toàn qua Evidence Gate}: Các đoạn trích được đưa qua bộ phân loại để sàng lọc tấn công và mâu thuẫn tiền đề.
+  \item \textbf{Tổng hợp câu trả lời}: Trong thiết kế có adapter Qwen2.5-3B tùy chọn. Nhiệt độ bằng không không bảo đảm nội dung đúng. Câu sinh phải qua kiểm tra bảo toàn bằng chứng; nếu không đạt thì chỉ dùng đoạn trích đủ điều kiện hoặc trả thiếu bằng chứng. Luồng hybrid trong hình là thiết kế nghiên cứu, chưa phải cấu hình chat mặc định.
+\end{enumerate}
+
+\subsection{Cơ chế kiểm chứng bằng chứng và xử lý thiếu phán quyết}
+
+\texttt{domain/evidence.py} hiện là bộ kiểm tra ngoại tuyến theo luật, không phải mô hình suy luận ngữ nghĩa tổng quát. Hàm \texttt{classify()} xử lý các nhóm điều kiện sau:
+\begin{enumerate}[nosep]
+  \item Kiểm tra kiểu dữ liệu và một số mẫu injection được khai báo, như \texttt{ignore previous instructions}, \texttt{<|im\_start|>} và chỉ thị tiếng Việt bỏ qua hướng dẫn. Danh sách mẫu hữu hạn không bao phủ mọi cách tấn công.
+  \item Phát hiện một tập hẹp các khẳng định phổ quát đối lập về hoàn tiền. Nhãn \texttt{CONFLICTS} chỉ báo cần đối chiếu; không đồng nghĩa đã giải quyết toàn bộ mâu thuẫn trong chính sách.
+  \item Tính tỷ lệ từ khóa sau chuẩn hóa; yêu cầu có từ chung trong thân đoạn và tỷ lệ khớp trong thân/ngữ cảnh ít nhất 0,5. Đây là heuristic cần hiệu chuẩn, không phải xác suất câu trả lời đúng.
+  \item Loại nội dung rỗng. Ngoại lệ trong bộ phân loại trả \texttt{DROPPED}; không tự chuyển thành bằng chứng hợp lệ.
+\end{enumerate}
+
+Ở use case \texttt{RetrievePolicy}, phán quyết thiếu mặc định được xem là \texttt{DROPPED}. Vì vậy lỗi bộ thẩm định không mở đường cho toàn bộ đoạn BM25/RRF đi qua. Dự phòng trích xuất chỉ áp dụng cho bằng chứng đã qua kiểm tra và còn hiệu lực; khi không đủ nguồn, hệ thống phản hồi thiếu bằng chứng. Cách xử lý này tách khả năng sẵn sàng của bộ sinh khỏi quyền sử dụng nguồn, không đưa ra bảo đảm uptime hay độ đúng tuyệt đối.

@@ -1,0 +1,79 @@
+% ==============================================================================
+% TRANG BÌA CHUẨN MẪU SAMSUNG INNOVATION CAMPUS (SIC) CÓ KHUNG VIỀN ĐÔI
+% ==============================================================================
+\begin{titlepage}
+  \thispagestyle{empty}
+  % --- Khung viền đôi trang trọng bao quanh toàn bộ trang bìa ---
+  \begin{tikzpicture}[remember picture, overlay]
+    \draw[line width=1.5pt, color=black]
+      ([xshift=2.2cm, yshift=-1.4cm]current page.north west)
+      rectangle
+      ([xshift=-1.2cm, yshift=1.4cm]current page.south east);
+    \draw[line width=0.5pt, color=black]
+      ([xshift=2.35cm, yshift=-1.55cm]current page.north west)
+      rectangle
+      ([xshift=-1.35cm, yshift=1.55cm]current page.south east);
+  \end{tikzpicture}
+
+  \begin{center}
+    \vspace*{-0.2cm}
+    \begin{tabularx}{\textwidth}{@{}X r@{}}
+      \footnotesize\textit{AI Course $\mid$ Capstone Project Final Report $\mid$ Student Submission} &
+      \IfFileExists{figures/sic_image1.png}{\includegraphics[height=0.95cm]{figures/sic_image1.png}}{\textbf{SAMSUNG INNOVATION CAMPUS}}
+    \end{tabularx}
+    \vspace{-0.2cm}
+    \noindent\rule{\textwidth}{0.8pt}
+
+    \vspace{0.45cm}
+    {\large\bfseries CHƯƠNG TRÌNH SAMSUNG INNOVATION CAMPUS (SIC)}\\[0.2cm]
+    {\normalsize\bfseries KHÓA HỌC TRÍ TUỆ NHÂN TẠO (ARTIFICIAL INTELLIGENCE COURSE)}\\[0.15cm]
+    {\small Báo cáo Đồ án Cuối khóa (Capstone Project Final Report)}
+
+    \vspace{0.45cm}
+    \begin{tcolorbox}[
+      colback=white,
+      colframe=black,
+      boxrule=0.8pt,
+      arc=1mm,
+      top=8pt,
+      bottom=8pt,
+      left=8pt,
+      right=8pt
+    ]
+      \centering
+      {\Large\bfseries XÂY DỰNG NỀN TẢNG ĐẶT VÉ SỰ KIỆN SMARTEVENT\\[0.15cm]
+      TÍCH HỢP TRỢ LÝ ẢO AI ĐA LƯỢT DỰA TRÊN MÔ HÌNH QWEN2.5\\[0.15cm]
+      (QLORA) VÀ KIẾN TRÚC HYBRID RAG}\\[0.25cm]
+      {\small\itshape (SmartEvent Ticketing Platform \& Grounded Read-Only Conversational AI Assistant)}
+    \end{tcolorbox}
+
+    \vspace{0.45cm}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabularx}{\textwidth}{|>{\columncolor{tableheader}\bfseries}p{4.6cm}|X|}
+      \hline
+      \multicolumn{2}{|c|}{\cellcolor{tableheader}\textbf{THÔNG TIN ĐỒ ÁN}} \\
+      \hline
+      Tên đề tài & Nền tảng đặt vé SmartEvent tích hợp Trợ lý ảo AI \\
+      \hline
+      Ngày báo cáo & 31/10/2026 \\
+      \hline
+      Nhóm thực hiện & Nhóm 2 \\
+      \hline
+      Giảng viên hướng dẫn & ThS. Vũ Thành Vinh \\
+      \hline
+      Thành viên 1 & Trần Phùng Đức Anh \\
+      \hline
+      Thành viên 2 & Bùi Mạnh Tiến \\
+      \hline
+      Thành viên 3 & Nguyễn Phúc Thanh \\
+      \hline
+      Thành viên 4 & Trịnh Đăng Huy \\
+      \hline
+    \end{tabularx}
+
+    \vfill
+    \noindent\rule{\textwidth}{0.4pt}\\[0.12cm]
+    {\footnotesize\copyright\ 2026 SAMSUNG. All rights reserved.}\\
+    {\small Hà Nội -- Năm 2026}
+  \end{center}
+\end{titlepage}

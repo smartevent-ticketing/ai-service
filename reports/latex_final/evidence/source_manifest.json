@@ -1,0 +1,58 @@
+{
+  "review_date": "2026-10-30",
+  "purpose": "Sources for LaTeX revision; no new application tests or model inference executed.",
+  "sources": [
+    {
+      "path": "ai-service/README.md",
+      "sha256": "bbb0c9308fbe8f54c0efc518a333aae0b711405760438f1bf0928025f98a64c4"
+    },
+    {
+      "path": "ai-service/configs/runtime_tool_registry.yaml",
+      "sha256": "5866f993344eb03c44e0a33a64acd906c6c8d7db57f3863efccd305fefa2808d"
+    },
+    {
+      "path": "ai-service/docs/architecture/AUDIT_REMEDIATION_2026_10_30.md",
+      "sha256": "6e4c476f102ddabe55a4cb105bc2c94faa977316666041d8f3121dd00d0dd394"
+    },
+    {
+      "path": "ai-service/docs/architecture/evidence/rag_semantic_benchmark.json",
+      "sha256": "935cfaa223c39a0326b19f31f24d24e3f2f106bf77ba87cfe5ff25f677b5f37c"
+    },
+    {
+      "path": "ai-service/models/massive_benchmark_report.json",
+      "sha256": "0a0535b4eb7af7655e7512fc2d995e028839cc4eae0797bd841d7a6d0d3354db"
+    },
+    {
+      "path": "ai-service/models/unpacked_nlu_1.5b/adapter_config.json",
+      "sha256": "daa3055d30b2ec162380704fd9998c5ebd6648c426bf0ff464e8ad5010b5f1ce"
+    },
+    {
+      "path": "ai-service/models/unpacked_rag_3b/adapter_config.json",
+      "sha256": "62d2d745c3549bed60c7d9bcd520f0c96223eaf93545893ff7c9badc83cde8c9"
+    },
+    {
+      "path": "ai-service/src/smartevent_ai/adapters/outbound/knowledge/lexical_reader.py",
+      "sha256": "9c8df655b8862fd15583f9dd2a954dfe9ab00a76916729c78c4571553e90acf3"
+    },
+    {
+      "path": "ai-service/src/smartevent_ai/application/retrieve_policy.py",
+      "sha256": "55141f49d1f26b0ee20cd08564e3bb4ca773f86379a6902c1dcc73ca0319102b"
+    },
+    {
+      "path": "ai-service/src/smartevent_ai/domain/dialogue.py",
+      "sha256": "3866c76f5858772c5adead3508e37fa050dadddccbe785785f2f857b0f2fc02f"
+    },
+    {
+      "path": "ai-service/src/smartevent_ai/domain/evidence.py",
+      "sha256": "49e9807f83bc17c84fce2dabd5910d5f0fb8b24ce844d6343237d6e35e15d6b2"
+    },
+    {
+      "path": "smartevent-infra/docs/infra/CHATBOT_VERIFICATION_2026_10_30.md",
+      "sha256": "46018ce3331874ca8e0a7b34d2bae9a6a616f6763639ff1747dc164f71e160dc"
+    },
+    {
+      "path": "ai-service/src/smartevent_ai/adapters/outbound/knowledge/structure_chunker.py",
+      "sha256": "e03689062aeb3a1cffd5c215f4e7a02671b89e7ddc2c0c76ddaffc424dc5346b"
+    }
+  ]
+}

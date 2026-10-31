@@ -1,0 +1,42 @@
+% ==============================================================================
+% commands.tex - Dinh nghia mau sac, kieu cot bang va lenh tuy bien
+% ==============================================================================
+
+% --- Dinh nghia bang mau ---
+\definecolor{tableheader}{gray}{0.93}
+\definecolor{codebg}{gray}{0.97}
+\definecolor{codeborder}{gray}{0.75}
+\definecolor{topfill}{HTML}{E3ECF8}
+\definecolor{topborder}{HTML}{2B4C7E}
+\definecolor{k1banner}{HTML}{163E7A}
+\definecolor{k1fill}{HTML}{DCE8F7}
+\definecolor{k1border}{HTML}{2B548E}
+\definecolor{k1text}{HTML}{12356B}
+\definecolor{k2banner}{HTML}{157347}
+\definecolor{k2fill}{HTML}{E2F5EC}
+\definecolor{k2border}{HTML}{198754}
+\definecolor{k2text}{HTML}{0F5132}
+\definecolor{k3banner}{HTML}{C85A00}
+\definecolor{k3fill}{HTML}{FFF0E5}
+\definecolor{k3border}{HTML}{D96B12}
+\definecolor{k3text}{HTML}{994400}
+\definecolor{frameborder}{HTML}{7B93B2}
+
+% --- Dinh nghia kieu cot bang (L, C, R) ---
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+
+% --- Duong dan tim kiem hinh anh va lenh chen bieu do tu dong ---
+\graphicspath{{./}{figures/}}
+\newcommand{\includechart}[2][0.96\textwidth]{%
+  \IfFileExists{figures/#2}{%
+    \includegraphics[width=#1]{figures/#2}%
+  }{%
+    \IfFileExists{#2}{%
+      \includegraphics[width=#1]{#2}%
+    }{%
+      \fbox{\parbox{0.92\textwidth}{\centering\vspace{0.5cm}\textbf{Biểu đồ kết quả:} \texttt{#2}\vspace{0.5cm}}}%
+    }%
+  }%
+}

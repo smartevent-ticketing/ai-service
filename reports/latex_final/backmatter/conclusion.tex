@@ -1,0 +1,105 @@
+\chapter*{Kết luận và hướng phát triển}
+\phantomsection
+\addcontentsline{toc}{chapter}{Kết luận và hướng phát triển}
+\markboth{Kết luận và hướng phát triển}{Kết luận và hướng phát triển}
+
+\section*{1. Kết quả đạt được}
+\phantomsection
+\addcontentsline{toc}{section}{1. Kết quả đạt được}
+
+Đồ án xây dựng được nền tảng nghiên cứu và triển khai trợ lý tiếng Việt cho SmartEvent. Các kết quả có thể ghi nhận ở mốc 30/10/2026 gồm:
+\begin{enumerate}[nosep]
+  \item Tổ chức dịch vụ AI theo Clean Architecture, có trạng thái hội thoại, NLU theo luật, gateway chỉ đọc, kiểm tra tham số và projection dữ liệu. Registry có 14 công cụ GET; việc khai báo công cụ không đồng nghĩa đã cho phép sử dụng trong cấu hình mặc định.
+  \item Thiết kế quy trình tạo dữ liệu tổng hợp, phân tách theo họ kịch bản, quản trị nguồn tri thức và huấn luyện hai adapter QLoRA. Các adapter hiện có xác nhận cấu hình LoRA; số liệu tập dữ liệu và đường cong huấn luyện được giữ dưới dạng kết quả lịch sử cần bổ sung hồ sơ tái lập.
+  \item Có cơ chế truy hồi BM25, kiểm tra điều kiện nguồn, trích dẫn và dự phòng trích xuất; có bằng chứng thử nghiệm ONNX/RRF trên corpus nhỏ ngoại tuyến. Chưa thể kết luận hybrid tốt hơn BM25 trên bài toán thực tế từ thử nghiệm này.
+  \item Hoàn thành một số kiểm tra thành phần và hồi quy được liệt kê tại Chương~\ref{chap:results_evaluation}. Các kết quả này cho thấy tiến độ triển khai, nhưng chưa đủ để xác nhận toàn bộ nền tảng vận hành thành công trong môi trường thương mại.
+\end{enumerate}
+
+\section*{2. Hạn chế và kế hoạch nghiệm thu tiếp theo}
+\phantomsection
+\addcontentsline{toc}{section}{2. Hạn chế và kế hoạch nghiệm thu tiếp theo}
+
+\begin{itemize}[nosep]
+  \item \textbf{Dữ liệu và mô hình:} Lưu trữ đầy đủ manifest, mã nguồn sinh, seed, phiên bản tokenizer và nhật ký trainer. Cần rà soát nhãn tổng hợp và mức độ trùng lặp ngữ nghĩa; đánh giá toàn diện JSON hợp lệ, intent, slot và cập nhật trạng thái trên tập held-out độc lập thay vì chỉ dựa vào token accuracy.
+  \item \textbf{Phân hệ RAG:} Nghiệm thu corpus chính sách đã duyệt, hiệu lực và cơ chế thu hồi; đối sánh thực nghiệm BM25, dense và hybrid trên cùng tập câu hỏi và cấu hình cố định; đo lường độ đúng trích dẫn, điều kiện và ngoại lệ.
+  \item \textbf{Tích hợp hệ thống:} Kiểm thử trên môi trường PostgreSQL/Docker riêng; xác minh migration, quyền reader, visibility, ngày giờ/giá/ghế và ủy quyền self-only trước khi mở các cổng nghiệp vụ.
+  \item \textbf{Vận hành và hiệu năng:} Đo lường cold start, độ trễ p50/p95, tải đồng thời, bộ nhớ RAM/VRAM và xử lý timeout; chạy lại toàn bộ test suite và coverage trên commit bàn giao; không diễn giải SKIPPED hay BLOCKED thành PASS.
+\end{itemize}
+
+Như vậy, kết quả hiện tại phù hợp với một nguyên mẫu có ranh giới quyền và các thành phần đã được kiểm tra riêng. Mục tiêu tiếp theo là thu thập bằng chứng nghiệm thu tích hợp có thể tái lập, rồi mới đánh giá mức sẵn sàng triển khai.
+
+\newpage
+\section*{3. Nhận xét và đánh giá của các thành viên}
+\phantomsection
+\addcontentsline{toc}{section}{3. Nhận xét và đánh giá của các thành viên}
+
+Mỗi thành viên trong nhóm tự đánh giá tinh thần học tập, mức độ hoàn thành nhiệm vụ được giao và đóng góp cá nhân vào kết quả chung của dự án SmartEvent thông qua Bảng \ref{tab:sic_member_reviews}:
+
+\begin{table}[H]
+\centering
+\caption{Bảng tự nhận xét và đánh giá của các thành viên trong nhóm (Theo mẫu SIC)}
+\label{tab:sic_member_reviews}
+\small
+\renewcommand{\arraystretch}{1.30}
+\begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}X|}
+\hline
+\rule{0pt}{2.4cm}\textbf{<ĐÍNH KÈM ẢNH CHỤP CHUNG CỦA NHÓM TẠI ĐÂY>}\\[2.0cm]
+\hline
+\end{tabularx}
+
+\vspace{0.3cm}
+\begin{tabularx}{\textwidth}{|C{4.2cm}|X|}
+\hline
+\rowcolor{tableheader}
+\multicolumn{1}{|c|}{\textbf{Họ và tên}} & \multicolumn{1}{c|}{\textbf{Nhận xét và đóng góp}} \\
+\hline
+Trần Phùng Đức Anh & \\[1.0cm]
+\hline
+Bùi Mạnh Tiến & \\[1.0cm]
+\hline
+Nguyễn Phúc Thanh & \\[1.0cm]
+\hline
+Trịnh Đăng Huy & \\[1.0cm]
+\hline
+\end{tabularx}
+\end{table}
+
+\newpage
+\section*{4. Đánh giá và nhận xét của giảng viên hướng dẫn}
+\phantomsection
+\addcontentsline{toc}{section}{4. Đánh giá và nhận xét của giảng viên hướng dẫn}
+
+Kết quả đánh giá, chấm điểm đồ án và các ý kiến đóng góp quý báu từ giảng viên hướng dẫn được ghi nhận tại Bảng \ref{tab:sic_instructor_evaluation}:
+
+\begin{table}[H]
+\centering
+\caption{Bảng đánh giá và chấm điểm của giảng viên hướng dẫn (Theo chuẩn SIC)}
+\label{tab:sic_instructor_evaluation}
+\small
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{|L{4.8cm}|C{2.6cm}|X|}
+\hline
+\rowcolor{tableheader}
+\textbf{Tiêu chí đánh giá} & \textbf{Điểm số} & \multicolumn{1}{c|}{\textbf{Nhận xét và góp ý}} \\
+\hline
+\rule{0pt}{1.1cm}\textbf{Ý tưởng đề tài (IDEA)} & \textbf{\_\_/10} & \\[0.6cm]
+\hline
+\rule{0pt}{1.1cm}\textbf{Tính ứng dụng thực tiễn (APPLICATION)} & \textbf{\_\_/30} & \\[0.6cm]
+\hline
+\rule{0pt}{1.1cm}\textbf{Kết quả thực nghiệm (RESULT)} & \textbf{\_\_/30} & \\[0.6cm]
+\hline
+\rule{0pt}{1.1cm}\textbf{Quản lý tiến độ dự án (PROJECT MANAGEMENT)} & \textbf{\_\_/10} & \\[0.6cm]
+\hline
+\rule{0pt}{1.1cm}\textbf{Báo cáo và thuyết minh (PRESENTATION \& REPORT)} & \textbf{\_\_/20} & \\[0.6cm]
+\hline
+\rule{0pt}{1.1cm}\textbf{TỔNG ĐIỂM (TOTAL)} & \textbf{\_\_/100} & \\[0.6cm]
+\hline
+\end{tabularx}
+\end{table}
+
+\vspace{0.4cm}
+\begin{flushright}
+  \textit{Hà Nội, ngày \dots\dots\ tháng \dots\dots\ năm 2026}\\[4pt]
+  \textbf{Giảng viên hướng dẫn}\\[1.8cm]
+  \textbf{ThS. Vũ Thành Vinh}
+\end{flushright}

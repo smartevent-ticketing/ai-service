@@ -1,0 +1,15 @@
+{
+  "pages": 45,
+  "overfull_boxes": 0,
+  "missing_characters": 0,
+  "undefined_references": false,
+  "rerun_required": false,
+  "date": "2026-10-31",
+  "compiler": "MiKTeX pdfLaTeX",
+  "application_tests_rerun": false,
+  "pdf_sha256": "1a14bd21037a35c2e766c3753ac48d4b65abaa7374a952a9604d9c134f4e87b6",
+  "nonblocking_warnings": [
+    "Vietnamese hyphenation patterns not preloaded",
+    "epstopdf shell escape disabled; report uses PNG/TikZ"
+  ]
+}

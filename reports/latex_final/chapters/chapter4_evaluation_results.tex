@@ -1,0 +1,197 @@
+\chapter{Kết quả, kiểm thử và đánh giá hệ thống}
+\label{chap:results_evaluation}
+
+Chương này phân biệt kết quả huấn luyện được lưu trong bản báo cáo trước, benchmark ngoại tuyến có artifact và kiểm chứng triển khai ngày 30/10/2026. Mỗi nhóm dùng tập dữ liệu, môi trường và đơn vị đo riêng; không suy ra chất lượng đầu cuối bằng cách ghép các tỷ lệ của chúng.
+
+\section{Nguồn bằng chứng và giới hạn tái lập}
+\label{sec:dataset_quality_evaluation}
+
+Bảng~\ref{tab:evidence_sources} quy định cách đọc các kết quả trong chương. Việc hiệu chỉnh báo cáo không thực hiện lại huấn luyện hay chạy lại bộ kiểm thử ứng dụng.
+\begin{table}[!htbp]
+\centering
+\caption{Phạm vi sử dụng các nguồn bằng chứng}
+\label{tab:evidence_sources}
+\small
+\begin{tabularx}{\textwidth}{|L{3.1cm}|X|X|}
+\hline
+\rowcolor{tableheader}\textbf{Nhóm nguồn} & \textbf{Nội dung có thể đối chiếu} & \textbf{Giới hạn kết luận} \\
+\hline
+Bản báo cáo trước & Quy mô 90.000 mẫu, cấu hình huấn luyện, đường cong loss và token accuracy & Chưa tìm thấy manifest dữ liệu và nhật ký trainer đầy đủ trong bộ nguồn đã rà soát; chưa tái lập độc lập. \\
+\hline
+Adapter QLoRA & Model nền, $r=16$, $\alpha=32$, dropout $0{,}05$, các lớp chiếu & Cấu hình adapter không chứng minh quy mô tập học, số epoch hoặc chất lượng mô hình. \\
+\hline
+Benchmark mô hình 25/10 & 131 mẫu NLU, 40 mẫu RAG; RTX 2050 4 GB & Mô hình thô, tập nhỏ; không phải kết quả nghiệm thu dịch vụ. \\
+\hline
+Benchmark truy hồi & 11 truy vấn, 2 tài liệu TEST\_ONLY, ONNX CPU & Kiểm tra đường ống ngoại tuyến; không chứng minh lợi thế hybrid hay an toàn production. \\
+\hline
+Biên bản 30/10 & Kiểm thử thành phần, build và những gate còn mở & Không thay thế full suite, coverage hiện hành, HTTP thật và E2E. \\
+\hline
+\end{tabularx}
+\end{table}
+
+Nguồn đối chiếu gồm cấu hình runtime, adapter, báo cáo benchmark và hai biên bản kiểm chứng liên repo~\cite{project_runtime_20261030,model_adapters,model_benchmark_20261025,semantic_offline,project_verify_20261030}. Danh mục đường dẫn và SHA-256 tại \nolinkurl{evidence/source_manifest.json} phục vụ nhận diện đúng phiên bản đã dùng để hiệu chỉnh báo cáo.
+
+\subsection{Quy mô dữ liệu và rò rỉ giữa các tập}
+
+Thống kê lịch sử tại Bảng~\ref{tab:kaggle_dataset_stats} mô tả 30.000 mẫu NLU và 60.000 mẫu RAG; đây là dữ liệu tổng hợp theo kịch bản, không phải 90.000 hội thoại khách hàng được thu thập độc lập. Chia theo \texttt{scenario\_family} giúp tránh đưa biến thể của cùng một họ vào train và validation, nếu định danh họ và phép chia được kiểm tra đúng. Tuy nhiên, giao nhau định danh bằng không không loại trừ trùng lặp ngữ nghĩa, nhãn sai hoặc việc tập test đã ảnh hưởng tới prompt. Vì vậy, báo cáo không dùng cụm ``Zero-Leakage 0\%'' như một bảo đảm tổng quát. Cần công bố dữ liệu, manifest chia tập và kết quả kiểm tra gần trùng trước khi xác nhận các thống kê này.
+
+\section{Đọc lại kết quả huấn luyện hai mô hình Qwen2.5}
+\label{sec:kaggle_training_results}
+
+Các bảng và hai hình sau được giữ từ bản báo cáo trước để phân tích~\cite{report_snapshot_20261029}. Chưa có nhật ký trainer đầy đủ để kiểm tra độc lập từng mốc. \textit{Token accuracy} đo mức khớp token theo cơ chế đánh giá của trainer; nhiều token định dạng JSON và câu trả lời mẫu có thể dễ dự đoán. Chỉ số này không đo trực tiếp intent đúng, schema hợp lệ, slot đúng, citation đúng hay giao dịch an toàn.
+
+\subsection{Mô hình NLU Qwen2.5-1.5B}
+\begin{table}[!htbp]
+\centering
+\caption{Các mốc huấn luyện NLU được ghi trong báo cáo trước}
+\label{tab:nlu_15b_metrics_progression}
+\small
+\begin{tabularx}{\textwidth}{|C{1.5cm}|X|X|X|X|}
+\hline
+\rowcolor{tableheader}\textbf{Bước} & \textbf{Train loss} & \textbf{Validation loss} & \textbf{Entropy} & \textbf{Token accuracy} \\
+\hline
+300 & 0,0592 & 0,3698 & 0,1585 & 93,91\% \\
+\hline
+600 & 0,0482 & 0,4017 & 0,1483 & 93,91\% \\
+\hline
+900 & 0,0440 & 0,4189 & 0,1477 & 93,88\% \\
+\hline
+1200 & 0,0426 & 0,4359 & 0,1446 & 93,85\% \\
+\hline
+1513 & 0,0421 & 0,4377 & 0,1455 & 93,85\% \\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includechart[0.90\textwidth]{01_nlu_training_loss_and_metrics.png}
+\caption{Biểu đồ NLU từ bản báo cáo trước; chỉ số token chưa được tái lập độc lập}
+\label{fig:nlu_loss_curve}
+\end{figure}
+
+Trong các mốc được ghi, train loss giảm từ 0,0592 xuống 0,0421 nhưng validation loss tăng từ 0,3698 lên 0,4377. Đây là dấu hiệu cần kiểm tra quá khớp hoặc khác biệt phân bố, thay vì kết luận mô hình tổng quát hóa tốt từ token accuracy cao. Cần so sánh checkpoint theo tiêu chí validation được xác định trước và đánh giá trên tập nghiệm thu chưa dùng để chọn mô hình. Entropy thấp chỉ cho biết phân bố dự đoán tập trung hơn, không chứng minh JSON đúng hoặc mô hình được hiệu chuẩn tốt.
+
+\subsection{Mô hình RAG-QA Qwen2.5-3B}
+\begin{table}[!htbp]
+\centering
+\caption{Các mốc huấn luyện RAG-QA được ghi trong báo cáo trước}
+\label{tab:rag_3b_exact_metrics}
+\small
+\begin{tabularx}{\textwidth}{|C{1.1cm}|X|X|X|X|R{2.3cm}|}
+\hline
+\rowcolor{tableheader}\textbf{Bước} & \textbf{Train loss} & \textbf{Validation loss} & \textbf{Entropy} & \textbf{Token accuracy} & \textbf{Token đã xử lý} \\
+\hline
+150 & 0,044322 & 0,053671 & 0,058448 & 98,42\% & 754.642 \\
+\hline
+300 & 0,038020 & 0,050335 & 0,060092 & 98,47\% & 1.514.353 \\
+\hline
+375 & 0,039048 & 0,049944 & 0,059398 & 98,50\% & 1.894.838 \\
+\hline
+\end{tabularx}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includechart[0.90\textwidth]{02_rag_training_loss_and_metrics.png}
+\caption{Biểu đồ RAG-QA từ bản báo cáo trước; ba mốc validation không đủ chứng minh không quá khớp}
+\label{fig:rag_3b_convergence_chart}
+\end{figure}
+
+Validation loss giảm ở ba mốc được ghi, là dấu hiệu cải thiện trên tập kiểm định tương ứng. Kết quả này không chứng minh ``Zero Overfitting'', chất lượng câu trả lời 98,50\% hay tỷ lệ citation đúng 100\%. Những kết luận đó đòi hỏi phép đo tác vụ với đáp án tham chiếu, mẫu số và tiêu chí chấm rõ ràng.
+
+\subsection{Tài nguyên và phạm vi đo}
+
+Bản báo cáo trước ghi mức VRAM 3,8 GB và 5,5 GB trong bối cảnh T4; hiện chưa đủ log để xác định đó là peak huấn luyện, suy luận hay bộ nhớ được cấp phát. Hai phép đo riêng không chứng minh có thể nạp đồng thời hai model với độ dài ngữ cảnh và tải phục vụ mong muốn. Benchmark mô hình bên dưới chạy trên RTX 2050 4 GB, là môi trường khác. Cần báo cáo riêng model load, KV cache, batch, độ dài đầu vào/đầu ra, cold start và peak VRAM/RAM trước khi chọn phần cứng triển khai.
+
+\section{Benchmark mô hình thô và ranh giới an toàn}
+\label{sec:live_inference_evaluation}
+
+Artifact \nolinkurl{models/massive_benchmark_report.json} ghi nhận 171 mẫu vào ngày 25/10/2026 trên NVIDIA GeForce RTX 2050 4 GB, lượng tử hóa NF4~\cite{model_benchmark_20261025}. Đây là bằng chứng đã lưu từ trước; đợt sửa báo cáo không chạy lại suy luận.
+
+\begin{table}[!htbp]
+\centering
+\caption{Các trường đo NLU trong artifact benchmark mô hình thô (131 mẫu)}
+\label{tab:raw_nlu_benchmark}
+\small
+\begin{tabularx}{\textwidth}{|X|C{3.2cm}|}
+\hline
+\rowcolor{tableheader}\textbf{Trường báo cáo} & \textbf{Giá trị được ghi} \\
+\hline
+JSON hợp lệ & 86,3\% \\
+\hline
+Độ chính xác ý định tổng thể & 42,7\% \\
+\hline
+Tỷ lệ khớp slot & 74,0\% \\
+\hline
+Tuân thủ chỉ đọc của mô hình thô & 40,0\% \\
+\hline
+Độ trễ p50 / p95 & 3,33 / 6,94 giây \\
+\hline
+\end{tabularx}
+\end{table}
+
+Chênh lệch giữa token accuracy lịch sử và intent accuracy cho thấy cần đánh giá theo đúng tác vụ. Sự khác biệt tập dữ liệu và cách chấm khiến hai chỉ số không thể so trực tiếp như cùng một phép đo. Đầu ra mô hình là dữ liệu không đáng tin cậy: JSON sai, nhãn ngoài enum, slot không được hỗ trợ hoặc hành động ngoài quyền phải bị parser/gateway từ chối; không chuyển thẳng thành lệnh gọi công cụ.
+
+Với 40 mẫu RAG, artifact ghi p50/p95 là 9,45/14,89 giây, cùng các trường tỷ lệ từ chối chỉ đọc và kháng ảo giác bằng 100\%. Các tỷ lệ này chỉ áp dụng cho nhóm ca do script chọn; chúng không chứng minh mọi câu hỏi đều an toàn. Trường \texttt{grounding\_accuracy\_rate} ghi 63,3\%, trong khi cộng số ca đúng theo các nhóm được liệt kê cho 29/40 (72,5\%). Do chưa đối soát được mẫu số/cách tổng hợp, báo cáo không dùng trường này làm kết luận định lượng về chất lượng RAG.
+
+Các hình cũ về ``chuẩn hóa chính xác 42\%'' và ``chặn 100\% ở năm nhóm'' không được dùng làm bằng chứng nghiệm thu: tần suất nhãn cần chuẩn hóa không phải tỷ lệ dự đoán đúng, và chưa có biên bản chạy đầu cuối tương ứng. \texttt{READ\_ONLY} là ràng buộc quyền của hệ thống; nó không bảo đảm câu trả lời luôn đúng hoặc loại bỏ toàn bộ prompt injection.
+
+\section{Đánh giá truy hồi ngoại tuyến}
+
+Artifact \nolinkurl{docs/architecture/evidence/rag_semantic_benchmark.json} có nhãn \texttt{OFFLINE\_RETRIEVAL\_ONLY}: 2 tài liệu công khai \texttt{TEST\_ONLY}, 4 vector và 11 truy vấn (5 dev, 6 test)~\cite{semantic_offline}. Trong đó có 7 câu có đáp án và 4 câu kỳ vọng không có nguồn. Bảng~\ref{tab:hybrid_rag_benchmark} giữ nguyên các chỉ số được artifact công bố cho nhóm có đáp án.
+
+\begin{table}[!htbp]
+\centering
+\caption{Truy hồi trên corpus kiểm thử nhỏ; không phải benchmark production}
+\label{tab:hybrid_rag_benchmark}
+\small
+\begin{tabularx}{\textwidth}{|X|C{2.8cm}|C{2.8cm}|C{3.0cm}|}
+\hline
+\rowcolor{tableheader}\textbf{Phương pháp} & \textbf{Hit@1 dev} & \textbf{Hit@1 test} & \textbf{Recall@5 dev/test} \\
+\hline
+BM25 & 1,000 & 1,000 & 1,000 / 1,000 \\
+\hline
+ONNX dense & 0,667 & 1,000 & 1,000 / 1,000 \\
+\hline
+Hybrid RRF & 1,000 & 1,000 & 1,000 / 1,000 \\
+\hline
+\end{tabularx}
+\end{table}
+
+Ở cả 4 câu không có đáp án, BM25 trả danh sách rỗng nhưng dense và hybrid vẫn xếp hạng tài liệu. Artifact ghi \texttt{dense\_abstention\_calibrated=false} và \texttt{runtime\_enable\_authorized=false}. Vì vậy, kết quả Recall@5 cao trên corpus nhỏ không thể dùng làm căn cứ mở gate hay tuyên bố hybrid từ chối đúng 100\%. Độ trễ truy vấn gộp p50/p95 khoảng 4,08/5,17 ms loại trừ thời gian nạp model; 6.144 byte vector không phải RAM đỉnh của tiến trình.
+
+Bản báo cáo trước có bảng Recall@1/Recall@3/MRR@5 cho 14.210 câu nhưng chưa có artifact tương ứng để đối chiếu; bảng đó được thay bằng bằng chứng ngoại tuyến nêu trên. Kế hoạch đánh giá đầy đủ cần tập held-out có đáp án và không có đáp án, nhãn nguồn liên quan, tập hiệu chuẩn riêng, cùng phép đo citation, điều kiện/ngoại lệ, độ trễ và chi phí.
+
+\section{Kiểm thử triển khai và các cổng nghiệm thu còn mở}
+
+Bảng~\ref{tab:full_system_test_results} tổng hợp biên bản ngày 30/10/2026~\cite{project_verify_20261030}. Đây là kết quả của những lượt chạy được ghi nhận, không phải tổng số test hiện có hoặc CI mới nhất.
+
+\begingroup
+\small
+\begin{longtable}{|L{2.5cm}|L{5.0cm}|L{7.0cm}|}
+\caption{Bằng chứng kiểm chứng thành phần đến ngày 30/10/2026}\label{tab:full_system_test_results}\\
+\hline
+\rowcolor{tableheader}\textbf{Phân hệ} & \textbf{Kết quả đã ghi nhận} & \textbf{Giới hạn và phần chưa kiểm chứng} \\
+\hline
+\endfirsthead
+\hline
+\rowcolor{tableheader}\textbf{Phân hệ} & \textbf{Kết quả đã ghi nhận} & \textbf{Giới hạn và phần chưa kiểm chứng} \\
+\hline
+\endhead
+Web & 134/134 test đạt; typecheck, lint và format đạt; local build tạo 29 trang; tiến trình báo Ready. & Lint còn 19 warning có sẵn. HTTP probe bị EACCES; chưa nghiệm thu HTTP smoke hoặc browser E2E. \\
+\hline
+Backend & Main/test biên dịch bằng javac; 22/22 test trọng tâm đạt qua JUnit, gồm MockMvc binding ngày giờ và lỗi query. & Lượt rộng ban đầu: 240 đạt/244 ca, 4 lỗi môi trường/cấu hình. Test Flyway sau đó chuyển sang Testcontainers và biên dịch lại; chưa chạy lại full suite. MockMvc không phải HTTP qua TCP. \\
+\hline
+AI & 310 test ngoại tuyến đạt ở lượt cơ sở; lượt cập nhật có 37 test liên quan đạt. Ruff/mypy và các guard đã ghi nhận đạt. & Hai tập có thể giao nhau, không cộng thành 347. 14 ca HTTP bị deselect ở lượt cơ sở. Full pytest, coverage hiện hành và model thật chưa kiểm chứng. \\
+\hline
+Hạ tầng & 5 unit test đạt; Ruff và kiểm tra YAML đạt. & 2 integration test bị SKIPPED do thiếu DB/driver. Docker API bị từ chối truy cập; PostgreSQL/pgvector chưa nghiệm thu. \\
+\hline
+Liên dịch vụ & Có hợp đồng giao tiếp và các kiểm thử thành phần. & E2E bốn repo, zero-write với DB thật, rollback và tải đồng thời: NOT VERIFIED. \\
+\hline
+\end{longtable}
+\endgroup
+
+Số liệu 392/392 test và coverage 90,82\% trong bản báo cáo trước không được dùng để đại diện cho phiên bản hiện hành khi chưa có lượt chạy toàn bộ cùng commit. Không diễn giải SKIPPED, deselected, BLOCKED hoặc NOT VERIFIED thành PASS.
+
+Các nhóm kiểm tra bổ trợ gồm: phân tích AST để phát hiện một số phụ thuộc/lời gọi cấm; kiểm tra schema và state delta; unit/regression cho truy hồi, projection và fallback; cuối cùng là HTTP/DB/E2E thực. Static guard không phải chứng minh toán học về mọi hành vi mạng. \texttt{SafeBackendTransport} giới hạn GET trên registry nhưng còn cần xác minh quyền truy cập, tác dụng phụ của endpoint và dữ liệu công khai ở backend. Chỉ khi các cổng tích hợp tương ứng có bằng chứng mới xem xét bật profile; cấu hình mặc định tiếp tục đóng.

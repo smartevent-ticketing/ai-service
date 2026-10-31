@@ -1,0 +1,68 @@
+% ==============================================================================
+% BÁO CÁO ĐỒ ÁN TỐT NGHIỆP KHÓA AI - SAMSUNG INNOVATION CAMPUS (SIC)
+% Đề tài: Xây dựng nền tảng đặt vé sự kiện SmartEvent tích hợp trợ lý ảo AI
+%         hỗ trợ tư vấn và tra cứu thông tin dựa trên Qwen2.5 (QLoRA) & RAG
+% ==============================================================================
+\documentclass[12pt,a4paper,oneside]{report}
+
+% --- Preamble: Gói lệnh, Cấu hình và Lệnh tùy biến ---
+\input{preamble/packages}
+\input{preamble/config}
+\input{preamble/commands}
+
+\begin{document}
+
+\hypersetup{pageanchor=false}
+\input{frontmatter/cover}
+\hypersetup{pageanchor=true}
+
+% --- Phần đầu báo cáo: Đánh số trang La Mã ---
+\pagenumbering{roman}
+\pagestyle{frontmatterstyle}
+\setcounter{page}{1}
+
+\input{frontmatter/abstract}
+
+% --- Mục lục, Danh mục hình vẽ, Danh mục bảng biểu ---
+\newpage
+\begingroup
+\setstretch{1.04}
+\setlength{\parskip}{0.5pt}
+\tableofcontents
+\endgroup
+\newpage
+\begingroup
+\setstretch{0.98}
+\setlength{\parskip}{0pt}
+\let\clearpage\relax
+\listoffigures
+\phantomsection
+\addcontentsline{toc}{chapter}{Danh mục Hình vẽ}
+\vspace{0.2cm}
+\listoftables
+\phantomsection
+\addcontentsline{toc}{chapter}{Danh mục Bảng biểu}
+\endgroup
+
+\newpage
+\input{frontmatter/abbreviations}
+
+% --- Thân báo cáo: Đánh số trang Ả Rập ---
+\newpage
+\pagenumbering{arabic}
+\pagestyle{fancy}
+\setcounter{page}{1}
+
+\input{frontmatter/introduction}
+
+% --- Các chương nội dung ---
+\input{chapters/chapter1_theory}
+\input{chapters/chapter2_system_design}
+\input{chapters/chapter3_data_ai_integration}
+\input{chapters/chapter4_evaluation_results}
+
+% --- Phần kết thúc: Kết luận và Tài liệu tham khảo ---
+\input{backmatter/conclusion}
+\input{backmatter/references}
+
+\end{document}

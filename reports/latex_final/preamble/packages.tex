@@ -1,0 +1,53 @@
+% ==============================================================================
+% packages.tex - Danh sach cac goi lenh (packages) su dung trong bao cao
+% ==============================================================================
+
+% --- Ho tro Tieng Viet tren ca pdfLaTeX va XeLaTeX ---
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T5]{fontenc}
+  \usepackage{mathptmx}
+  \usepackage[vietnamese]{babel}
+\else
+  \usepackage{fontspec}
+  \setmainfont{Times New Roman}
+  \setsansfont{Arial}
+  \setmonofont{Consolas}
+  \usepackage[vietnamese]{babel}
+\fi
+
+% --- Dinh dang trang & Can le ---
+\usepackage{geometry}
+\usepackage{setspace}
+
+% --- Toan hoc, Bang bieu, Hinh ve ---
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage[table]{xcolor}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{enumitem}
+
+% --- Dinh dang tieu de, Header & Footer ---
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+
+% --- Khung hop, TikZ & PGFPlots ---
+\usepackage[most]{tcolorbox}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit, backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+% --- Hien thi ma nguon ---
+\usepackage{listings}
+
+% --- Hyperlink & PDF Metadata ---
+\usepackage{hyperref}

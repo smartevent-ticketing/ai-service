@@ -1,0 +1,498 @@
+\chapter{Phân tích và thiết kế hệ thống}
+\label{chap:system_design}
+
+Chương này mô tả kiến trúc mục tiêu của bốn phân hệ và đối chiếu hiện trạng ngày 30/10/2026. Phân hệ AI có baseline theo luật và BM25; mô hình Qwen, hybrid và công cụ nghiệp vụ là các tích hợp có điều kiện. Đặc tả Ontology v1.2 được giữ để giải thích thiết kế dữ liệu, không dùng thay hợp đồng runtime.
+
+\section{Kiến trúc tổng thể và vai trò của các phân hệ}
+\label{sec:overall_architecture}
+
+Hệ thống SmartEvent được nhóm tổ chức thành các kho mã nguồn (repositories) tách biệt rõ trách nhiệm nhưng phối hợp chặt chẽ với nhau qua giao thức HTTP/REST. Sơ đồ kết nối tổng thể của toàn hệ thống được thể hiện tại Hình \ref{fig:overall_system_architecture}.
+
+\begin{figure}[!ht]
+\centering
+\vspace{-0.25cm}
+\noindent\makebox[\textwidth][c]{%
+\begin{tikzpicture}[
+  every node/.style={font=\footnotesize\linespread{1.02}\selectfont},
+  titlebox/.style={rectangle, rounded corners=3pt, draw=topborder, fill=topfill!60, line width=0.8pt, align=center, inner sep=4pt},
+  webbox/.style={rectangle, rounded corners=3pt, draw=k1border, fill=k1fill!55, line width=0.8pt, align=center, inner sep=4pt},
+  aibox/.style={rectangle, rounded corners=3pt, draw=k2border, fill=k2fill!55, line width=0.8pt, align=center, inner sep=4pt},
+  backendbox/.style={rectangle, rounded corners=3pt, draw=k3border, fill=k3fill!55, line width=0.9pt, align=center, inner sep=4.5pt},
+  infrabox/.style={rectangle, rounded corners=2pt, draw=black!65, fill=gray!8, thin, align=center, inner sep=3.5pt}
+]
+  % 1. Client Browser (Top)
+  \node[titlebox, minimum width=11.0cm, text width=10.6cm] (client) at (0, 5.3) {
+    \textbf{Khách Hàng \& Ban Tổ Chức (Web Browser)}\\[1.5pt]
+    \scriptsize Storefront mua vé $\bullet$ Quản lý tài khoản $\bullet$ Cổng Organizer/Admin $\bullet$ Soát vé QR
+  };
+
+  % 2. smartevent-web (Middle-Left)
+  \node[webbox, minimum width=6.8cm, text width=6.4cm] (web) at (-3.9, 3.3) {
+    \textbf{\texttt{smartevent-web} (Next.js 16)}\\[2pt]
+    \scriptsize Storefront $\bullet$ BFF: \nolinkurl{/api/chat}, \nolinkurl{/api/v1/}\\[1pt]
+    Bảo mật Cookie \texttt{HttpOnly} $\bullet$ Cổng 3000
+  };
+
+  % 3. ai-service (Middle-Right)
+  \node[aibox, minimum width=6.8cm, text width=6.4cm] (ai) at (3.9, 3.3) {
+    \textbf{\texttt{ai-service} (FastAPI Python 3.12)}\\[2pt]
+    \scriptsize Trợ lý ảo AI \textbf{\texttt{READ\_ONLY}} $\bullet$ Cổng 8000\\[1pt]
+    NLU theo luật $\bullet$ BM25 có gate $\bullet$ Qwen tùy chọn
+  };
+
+  % 4. smartevent-backend (Center)
+  \node[backendbox, minimum width=15.0cm, text width=14.6cm] (backend) at (0, 0.85) {
+    \textbf{\texttt{smartevent-backend} (Java 17 / Spring Boot 4.0.7 / Modular Monolith)}\\[2pt]
+    \scriptsize Nguồn dữ liệu nghiệp vụ: danh tính, sự kiện, vé, giữ chỗ, đơn hàng, thanh toán, hóa đơn và outbox\\[1.5pt]
+    Khóa bi quan \texttt{SELECT FOR UPDATE} $\bullet$ Giữ chỗ 10 phút $\bullet$ Cổng 8080
+  };
+
+  % 5. Infra Storage Tier (Bottom Row)
+  \node[infrabox, minimum width=3.3cm, text width=3.05cm] (db) at (-5.4, -1.3) {
+    \textbf{PostgreSQL 16}\\[1.5pt]
+    \scriptsize Flyway migrations\\Dữ liệu giao dịch ACID
+  };
+  \node[infrabox, minimum width=3.3cm, text width=3.05cm] (redis) at (-1.8, -1.3) {
+    \textbf{Redis 7}\\[1.5pt]
+    \scriptsize Lưu Cache \& Session\\Khóa chống trùng $\bullet$ TTL 10p
+  };
+  \node[infrabox, minimum width=3.3cm, text width=3.05cm] (mq) at (1.8, -1.3) {
+    \textbf{RabbitMQ 3}\\[1.5pt]
+    \scriptsize Transactional Outbox\\Hàng đợi tin nhắn
+  };
+  \node[infrabox, minimum width=3.3cm, text width=3.05cm] (s3) at (5.4, -1.3) {
+    \textbf{MinIO S3}\\[1.5pt]
+    \scriptsize Object Storage\\Ảnh sự kiện \& Quy chế
+  };
+
+  % Connecting Arrows
+  \draw[-{Stealth[length=2.0mm]}, line width=0.7pt, color=k1border] (client.south -| web.north) -- (web.north)
+    node[midway, left=3pt, font=\scriptsize\bfseries] {HTTPS};
+
+  \draw[-{Stealth[length=2.0mm]}, line width=0.7pt, color=k2border] (web.east) -- (ai.west)
+    node[midway, above=3pt, font=\scriptsize\bfseries] {Chat};
+
+  \draw[-{Stealth[length=2.0mm]}, line width=0.7pt, color=k1border] (web.south) -- (web.south |- backend.north)
+    node[midway, left=3pt, font=\scriptsize\bfseries] {REST JSON (BFF)};
+
+  \draw[-{Stealth[length=2.0mm]}, line width=0.9pt, dashed, color=k2border] (ai.south) -- (ai.south |- backend.north)
+    node[midway, right=3pt, font=\scriptsize\bfseries, text=k2text] {GET qua gate};
+
+  \draw[-{Stealth[length=1.8mm]}, thin] (backend.south -| db.north) -- (db.north);
+  \draw[-{Stealth[length=1.8mm]}, thin] (backend.south -| redis.north) -- (redis.north);
+  \draw[-{Stealth[length=1.8mm]}, thin] (backend.south -| mq.north) -- (mq.north);
+  \draw[-{Stealth[length=1.8mm]}, thin] (backend.south -| s3.north) -- (s3.north);
+
+\end{tikzpicture}%
+}
+\vspace{-0.25cm}
+\caption{Kiến trúc tích hợp SmartEvent; đường nét đứt chỉ kết nối nghiệp vụ có điều kiện}
+\label{fig:overall_system_architecture}
+\end{figure}
+
+Kiến trúc phân tầng của SmartEvent được thiết kế theo nguyên tắc phân tách trách nhiệm (Separation of Concerns):
+\begin{itemize}[nosep]
+  \item \textbf{Tầng hạ tầng và điều phối mạng (\texttt{smartevent-infra})}: Quản lý tập trung bằng Docker Compose; tích hợp máy chủ phân phối ngược Caddy (Caddy reverse proxy) đảm nhiệm tiếp nhận kết nối HTTPS cổng 80/443, tự động quản lý chứng chỉ SSL và định tuyến an toàn tới các dịch vụ nội bộ; hệ thống Redis 7 chịu trách nhiệm lưu trữ bộ nhớ đệm (cache), phiên làm việc (session state) và khóa phân tán chống trùng lặp.
+  \item \textbf{Tầng giao diện}: \texttt{smartevent-web} tiếp nhận tương tác người dùng, tích hợp BFF Proxy bảo mật qua Cookie \texttt{HttpOnly}.
+  \item \textbf{Tầng trợ lý AI}: \texttt{ai-service} xử lý hội thoại chỉ đọc. Registry có 14 công cụ nhưng cấu hình mặc định tắt; profile local được xem xét riêng theo bằng chứng tích hợp.
+  \item \textbf{Tầng giao dịch lõi}: \texttt{smartevent-backend} giữ vai trò SSOT, thực thi khóa \texttt{SELECT FOR UPDATE} và Outbox bất đồng bộ.
+  \item \textbf{Tầng dữ liệu}: Phân tách giữa PostgreSQL 16 (ACID), Redis 7 (khóa phân tán, cache/session), RabbitMQ 3 (tin nhắn) và MinIO S3 (lưu trữ ảnh).
+\end{itemize}
+
+Bảng \ref{tab:four_repos_summary} tóm tắt công nghệ và nhiệm vụ chính của 4 phân hệ chính thức trong dự án:
+
+\begin{table}[htbp]
+\centering
+\caption{Chức năng và công nghệ sử dụng của các phân hệ trong dự án}
+\label{tab:four_repos_summary}
+\small
+\renewcommand{\arraystretch}{1.18}
+\begin{tabularx}{\textwidth}{|L{3.6cm}|L{4.2cm}|X|}
+\hline
+\rowcolor{tableheader}
+\textbf{Tên phân hệ} & \textbf{Công nghệ chính} & \textbf{Vai trò trong hệ thống} \\
+\hline
+\texttt{smartevent-\allowbreak backend} & Java 17, Spring Boot 4.0.7, PostgreSQL 16, Redis, RabbitMQ & Xử lý toàn bộ nghiệp vụ cốt lõi: phân quyền người dùng, quản lý sự kiện, giữ chỗ vé, thanh toán đơn hàng, hoàn tiền và soát vé QR. \\
+\hline
+\texttt{smartevent-web} & Next.js 16.3.2, React 19, TypeScript, Tailwind CSS 4 & Giao diện web cho người mua vé, nhà tổ chức, nhân viên soát vé và quản trị viên; tích hợp lớp BFF Proxy bảo mật phiên đăng nhập. \\
+\hline
+\texttt{smartevent-infra} & Docker Compose, Caddy Reverse Proxy, Redis, MinIO, Prometheus, Grafana & Khởi tạo và điều phối toàn bộ hạ tầng: Caddy reverse proxy phân phối HTTPS và bảo vệ cổng nội bộ, Redis lưu trữ cache/session và khóa phân tán, MinIO lưu trữ ảnh/quy chế, cùng hệ thống giám sát Prometheus/Grafana. \\
+\hline
+\texttt{ai-service} & Python 3.12, FastAPI, Pydantic v2, ONNX Runtime & Dịch vụ chatbot thông minh hoạt động ở chế độ chỉ đọc (\texttt{READ\_ONLY}), hỗ trợ tìm sự kiện, gợi ý vé theo ngân sách và giải đáp chính sách. \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsection{Hạ tầng triển khai và điều phối dịch vụ (\texttt{smartevent-infra})}
+
+Phân hệ \texttt{smartevent-infra} đóng vai trò nền tảng điều phối toàn bộ tài nguyên hệ thống thông qua Docker Compose, bảo đảm tính nhất quán và khả năng mở rộng giữa các môi trường:
+\begin{itemize}[nosep]
+  \item \textbf{Máy chủ phân phối ngược Caddy (Caddy Reverse Proxy)}: Đóng vai trò cổng vào duy nhất (Ingress / Reverse Proxy) xuất bản các cổng mạng 80 và 443 ra môi trường ngoài. Caddy tự động cấp phát và gia hạn chứng chỉ bảo mật TLS/HTTPS, định tuyến thông minh theo tên miền đến giao diện web \texttt{smartevent-web}, dịch vụ xử lý nghiệp vụ \texttt{smartevent-backend}, dịch vụ trợ lý ảo \texttt{ai-service} và hệ thống lưu trữ MinIO. Toàn bộ các dịch vụ cơ sở dữ liệu và trung gian phía sau không mở cổng trực tiếp ra ngoài máy chủ, tạo thành vành đai bảo vệ mạng nội bộ vững chắc.
+  \item \textbf{Hệ thống lưu trữ bộ nhớ đệm và phiên làm việc (Redis)}: Redis 7 trong \texttt{smartevent-infra} đảm nhiệm lưu trữ bộ nhớ đệm (cache) cho các danh mục sự kiện và dữ liệu tra cứu tần suất cao nhằm giải tỏa tải đọc cho PostgreSQL; quản lý phiên đăng nhập và trạng thái người dùng (session state); lưu trữ khóa chống trùng lặp (\texttt{idempotency\_key}) ngăn chặn đặt vé lặp; và quản lý thời hạn giữ chỗ 10 phút (TTL).
+  \item \textbf{Lưu trữ dữ liệu và giám sát hiệu năng}: Cơ sở dữ liệu giao dịch PostgreSQL 16 (ACID), hàng đợi tin nhắn RabbitMQ 3 (Transactional Outbox), máy chủ lưu trữ đối tượng MinIO (tương thích Amazon S3) lưu ảnh và tệp quy chế, kết hợp cùng hệ thống giám sát thời gian thực Prometheus và Grafana.
+\end{itemize}
+
+\section{Phân hệ Giao dịch Backend và Giao thức Kết nối Dữ liệu Chỉ đọc}
+\label{sec:backend_read_only_protocol}
+
+Backend là nguồn dữ liệu nghiệp vụ, quản lý danh tính, sự kiện, vé, giữ chỗ và thanh toán. Khóa dòng và Transactional Outbox là các cơ chế thiết kế nhằm kiểm soát đồng thời và chuyển sự kiện tin cậy \cite{ddia_kleppmann_2017, microservices_richardson_2018}; không từ đó suy ra đã chứng minh không bán vượt hoặc không sai lệch số dư dưới mọi tải. Các kịch bản cạnh tranh, timeout và giao dịch cần kiểm thử trên database test riêng.
+
+Gateway AI chỉ cho phép GET tới các endpoint cố định trong registry sau khi đạt gate. GET có tác dụng ghi vẫn bị cấm. Công cụ dữ liệu tài khoản cần ủy quyền self-only đã kiểm chứng; trạng thái hội thoại do client gửi không phải bằng chứng danh tính. Đợt kiểm chứng này chưa cho phép mở các công cụ riêng tư.
+
+Tách quyền giao dịch của backend khỏi quyền tư vấn của AI giúp giới hạn tác động khi mô hình sinh sai. Projection, xác thực, kiểm tra trạng thái công khai và giới hạn giao vận vẫn cần phối hợp; thiết kế chỉ đọc không tự loại bỏ prompt injection hoặc câu trả lời sai.
+
+\section{Thiết kế Kiến trúc Chi tiết của Phân hệ Truy hồi Tri thức RAG (knowledge subsystem)}
+\label{sec:rag_subsystem_design}
+
+Trả lời về hoàn hủy vé, hoãn sự kiện, độ tuổi hoặc vật dụng được mang vào phải bám văn bản còn hiệu lực và giữ đủ điều kiện, ngoại lệ. Mô hình sinh tự do có thể đưa ra cam kết sai, nên phân hệ RAG cần quản lý thẩm quyền nguồn và kiểm tra câu trả lời.
+
+Phân hệ \texttt{knowledge} tách quản trị nguồn khỏi truy hồi và tổng hợp. Hình~\ref{fig:rag_knowledge_pipeline_architecture} trình bày thiết kế nghiên cứu gồm cả ONNX/RRF; chat mặc định không bật hybrid. Baseline BM25 chỉ dùng nguồn được gate tương ứng chấp thuận; không nạp embedding trong mỗi lượt chat.
+
+\begin{figure}[!htbp]
+\centering
+\vspace{0.1cm}
+\noindent\makebox[\textwidth][c]{%
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize\linespread{1.02}\selectfont},
+  box/.style={rectangle, rounded corners=3pt, draw=topborder, fill=topfill!50, line width=0.7pt, align=center, inner sep=3.5pt},
+  lexbox/.style={rectangle, rounded corners=3pt, draw=k1border, fill=k1fill!50, line width=0.7pt, align=center, inner sep=3.5pt},
+  densebox/.style={rectangle, rounded corners=3pt, draw=k2border, fill=k2fill!50, line width=0.7pt, align=center, inner sep=3.5pt},
+  gatebox/.style={rectangle, rounded corners=3pt, draw=k3border, fill=k3fill!50, line width=0.7pt, align=center, inner sep=3.5pt},
+  synthbox/.style={rectangle, rounded corners=3pt, draw=topborder, fill=topfill!60, line width=0.8pt, align=center, inner sep=3.5pt}
+]
+  % Column 1: Input Query & Snapshot t0 (x = -5.9)
+  \node[box, minimum width=3.1cm, text width=2.85cm] (query) at (-5.9, 0.0) {
+    \textbf{1. Tiếp nhận truy vấn}\\[1pt]
+    \scriptsize Câu hỏi chính sách \& quy chế\\[1pt]
+    Snapshot $t_0$: \texttt{catalog\_sha256}\\[1pt]
+    Kiểm tra \texttt{eligible(now)}
+  };
+
+  % Column 2: Dual Retrieval (x = -2.0)
+  \node[lexbox, minimum width=3.3cm, text width=3.05cm] (bm25) at (-2.0, 1.35) {
+    \textbf{2a. BM25 (RAM)}\\[1pt]
+    \scriptsize Chỉ mục RAM $\bullet$ Bỏ dấu\\
+    Từ khóa chuẩn hóa $\bullet$ Lọc từ dừng\\
+    $\rightarrow$ \textbf{Top-5 BM25}
+  };
+
+  \node[densebox, minimum width=3.3cm, text width=3.05cm] (onnx) at (-2.0, -1.35) {
+    \textbf{2b. ONNX Dense (CPU)}\\[1pt]
+    \scriptsize ONNX Runtime CPU (2 luồng)\\
+    \texttt{query:}/\texttt{passage:} $\bullet$ 384-d\\
+    Mean Pooling L2 $\rightarrow$ \textbf{Top-5}
+  };
+
+  % Column 3: RRF Combiner (x = 1.6)
+  \node[box, minimum width=2.8cm, text width=2.55cm] (rrf) at (1.6, 0.0) {
+    \textbf{3. Hợp nhất RRF}\\[1pt]
+    \scriptsize $k = 60 \bullet$ Xếp hạng\\
+    $RRF = \sum \frac{1}{60 + r_m(d)}$\\[1pt]
+    $\rightarrow$ \textbf{Top-5 ứng viên}
+  };
+
+  % Column 4: Verification & Synthesis (x = 5.4)
+  \node[gatebox, minimum width=3.5cm, text width=3.25cm] (gate) at (5.4, 1.35) {
+    \textbf{4. Cổng Evidence Gate}\\[1pt]
+    \scriptsize Chặn Injection $\bullet$ Mâu thuẫn\\
+    Lọc $\ge 50\%$ $\bullet$ Kiểm tra rỗng\\
+    Snapshot $t_1 \leftrightarrow t_0 \bullet$ Fail-Closed
+  };
+
+  \node[synthbox, minimum width=3.5cm, text width=3.25cm] (synth) at (5.4, -1.35) {
+    \textbf{5. PolicySynthesizer}\\[1pt]
+    \scriptsize Ollama 3B / Peft (temp = 0)\\
+    Kiểm tra nội dung và \texttt{Citation}\\
+    \textit{Trích xuất khi sinh không đạt}
+  };
+
+  % Connectors
+  \draw[-{Stealth[length=1.8mm]}, line width=0.7pt, color=k1border] (query.east) -- ++(0.3,0) |- (bm25.west);
+  \draw[-{Stealth[length=1.8mm]}, line width=0.7pt, color=k2border] (query.east) -- ++(0.3,0) |- (onnx.west);
+
+  \draw[-{Stealth[length=1.8mm]}, line width=0.7pt, color=k1border] (bm25.east) -- ++(0.2,0) |- ([yshift=3pt]rrf.west);
+  \draw[-{Stealth[length=1.8mm]}, line width=0.7pt, color=k2border] (onnx.east) -- ++(0.2,0) |- ([yshift=-3pt]rrf.west);
+
+  \draw[-{Stealth[length=1.8mm]}, line width=0.7pt] (rrf.east) -- ++(0.3,0) |- (gate.west);
+  \draw[-{Stealth[length=1.8mm]}, line width=0.7pt] (gate.south) -- (synth.north)
+    node[midway, right=2pt, font=\scriptsize\bfseries] {KEPT};
+
+\end{tikzpicture}%
+}
+\vspace{0.1cm}
+\caption{Thiết kế nghiên cứu của Phân hệ Truy hồi Tri thức RAG (\texttt{knowledge subsystem})}
+\label{fig:rag_knowledge_pipeline_architecture}
+\end{figure}
+
+\subsection{Mô hình miền tri thức và cơ chế kiểm soát hiệu lực nghiêm ngặt (Knowledge Domain Model)}
+
+Tầng miền tri thức (\texttt{domain/knowledge.py}) dùng thư viện chuẩn Python và các cấu trúc dữ liệu bất biến (\textit{frozen dataclasses}):
+\begin{itemize}[nosep]
+  \item \textbf{Cấu trúc \texttt{SourceMetadata}}: Định danh nguồn gốc pháp lý văn bản chính sách: mã tài liệu (\texttt{source\_id}), phiên bản (\texttt{version}), tiêu đề (\texttt{title}), định danh chuẩn tắc (\texttt{canonical\_uri}), mã băm SHA-256 (\texttt{content\_sha256}), trạng thái (\texttt{status} thuộc \texttt{DRAFT}, \texttt{APPROVED}, \texttt{REVOKED}, \texttt{SUPERSEDED}), đối tượng khán giả (\texttt{audience} thuộc \texttt{PUBLIC}, \texttt{CUSTOMER}, \texttt{STAFF}), thời điểm phê duyệt (\texttt{approved\_at}), hiệu lực (\texttt{effective\_from} đến \texttt{effective\_until}), hạn rà soát (\texttt{review\_due\_at}), cùng \texttt{owner}, \texttt{reviewer} và mã quyết định phê duyệt (\texttt{approval\_id}). Mọi mốc thời gian đều bắt buộc có múi giờ tường minh (\texttt{tzinfo}).
+  \item \textbf{Cấu trúc \texttt{KnowledgeChunk}}: Từng đoạn trích tri thức từ tài liệu gốc với định danh băm tất định duy nhất \texttt{chunk\_id} (hàm \texttt{fingerprint}), mã băm văn bản \texttt{chunk\_sha256}, nội dung văn bản \texttt{text}, chuỗi ngữ cảnh kế thừa \texttt{context}, cây tiêu đề phân cấp \texttt{heading\_path}, vị trí (\texttt{start}, \texttt{end}), số lượng token \texttt{token\_count}, mã hồ sơ cắt đoạn \texttt{profile\_sha256} và phạm vi khối cha (\texttt{parent\_start}, \texttt{parent\_end}).
+  \item \textbf{Cấu trúc danh mục tri thức \texttt{CatalogRecord}}: Bản kê khai toàn bộ tài liệu chính sách được phép lưu hành trong hệ thống, xác định rõ mục đích (\texttt{purpose} là \texttt{TEST\_ONLY} hoặc \texttt{PRODUCTION}), thời điểm cấp phát (\texttt{issued\_at}), thời điểm hết hạn danh mục (\texttt{expires\_at}) và tham chiếu phê duyệt pháp lý.
+\end{itemize}
+
+Trước khi bất kỳ đoạn trích nào được nạp vào chỉ mục phục vụ truy hồi, hàm kiểm tra tính hợp lệ \texttt{eligible(now)} tiến hành xác thực 5 điều kiện tiên quyết nghiêm ngặt:
+\begin{equation}
+\label{eq:source_eligibility}
+\text{Eligible}(S, t_{\text{now}}) \iff \left\{
+\begin{array}{l}
+S.\text{status} = \texttt{APPROVED} \\
+S.\text{audience} = \texttt{PUBLIC} \\
+S.\text{approved\_at} \le t_{\text{now}} \\
+S.\text{effective\_from} \le t_{\text{now}} < S.\text{review\_due\_at} \\
+(S.\text{effective\_until} \text{ is None}) \lor (t_{\text{now}} < S.\text{effective\_until})
+\end{array}
+\right.
+\end{equation}
+
+Nếu hai phiên bản của cùng \texttt{source\_id} đồng thời đủ điều kiện, hệ thống báo lỗi \texttt{KnowledgeError} và không tự chọn một phiên bản để trả lời.
+
+\subsection{Đường ống nạp và phân đoạn tài liệu có cấu trúc (Knowledge Ingestion Pipeline)}
+
+Quy trình nạp và lập chỉ mục văn bản chính sách được thiết kế khép kín và tất định, gồm 3 thành phần chính:
+\begin{enumerate}[nosep]
+  \item \textbf{Bộ nạp tài liệu an toàn \texttt{LocalDocumentLoader}}: Chỉ chấp nhận các đường dẫn tương đối trỏ tới tệp định dạng \texttt{.md} hoặc \texttt{.txt} nằm trọn trong thư mục tài liệu được chỉ định. Bộ nạp tự động kiểm tra chống tấn công thoát thư mục gốc (\textit{directory traversal}), cấm hoàn toàn liên kết mềm (symlink), giới hạn kích thước tệp tối đa (1 MB), chuẩn hóa mã hóa ký tự UTF-8 dạng NFC, đồng thời quét kiểm tra mã băm SHA-256 đối chiếu với danh mục phê duyệt và loại bỏ ngay các văn bản chứa ký tự điều khiển lạ hoặc mẫu chỉ dẫn phá rào (\textit{prompt injection}).
+  \item \textbf{Bộ cắt đoạn cấu trúc \texttt{StructureChunker}}: Khác với các bộ cắt đoạn ngẫu nhiên theo số ký tự thông thường, \texttt{StructureChunker} phân tích sâu cấu trúc tài liệu Markdown:
+  \begin{itemize}[nosep]
+    \item \textit{Phân tích cây tiêu đề (\texttt{\_sections})}: Bóc tách các tiêu đề từ cấp 1 đến cấp 6 (\texttt{\#}) ngoài khối mã để duy trì đường dẫn ngữ cảnh phân cấp \texttt{heading\_path} (ví dụ: \textit{Chính sách hoàn vé > Đêm nhạc Symphony > Điều kiện bất khả kháng}).
+    \item \textit{Cô lập bảng và lặp tiêu đề bảng (\texttt{\_parts})}: Tách riêng các bảng Markdown khỏi văn bản đoạn văn thường. Khi một bảng biểu dài vượt quá giới hạn token của một đoạn, bộ cắt đoạn tự động trích xuất và lặp lại dòng tiêu đề cột của bảng ở đầu ngữ cảnh (\texttt{context}) của từng đoạn cắt nhỏ. Nhờ đó, các hàng dữ liệu bảng biểu không bao giờ bị mất ý nghĩa cột khi đưa vào mô hình nhúng và mô hình sinh.
+    \item \textit{Ràng buộc kích thước và bước gối đầu}: Giới hạn kích thước tối đa 384 tokens mỗi đoạn (\texttt{max\_tokens = 384}), bước gối đầu trượt 64 tokens (\texttt{overlap\_tokens = 64}) và giới hạn tối đa 2.000 đoạn trên mỗi tài liệu.
+    \item \textit{Chọn điểm cắt và kiểm tra lại (\texttt{\_fit})}: Hàm dùng tìm kiếm nhị phân để chọn một tiền tố, sau đó đếm token lại và thu ngắn nếu còn vượt ngân sách. Do BPE không bảo đảm số token tăng đơn điệu theo số ký tự, không khẳng định điểm tìm được là tiền tố dài nhất có thể. Điều kiện cần kiểm chứng là đoạn cuối cùng cùng ngữ cảnh không vượt giới hạn token.
+  \end{itemize}
+  \item \textbf{Tệp kê khai toàn vẹn chỉ mục \texttt{BUILD\_MANIFEST.json}}: Quá trình đóng gói chỉ mục ngoại tuyến xuất ra hai tệp dữ liệu \texttt{release.json} và \texttt{chunks.jsonl}, đồng thời sinh tệp kê khai toàn vẹn \texttt{BUILD\_MANIFEST.json} lưu trữ mã băm SHA-256 chuẩn tắc của toàn bộ chỉ mục. Khi dịch vụ thời gian thực khởi động, hệ thống đối chiếu khớp từng byte mã băm; nếu phát hiện chỉ mục bị sửa đổi trái phép, hệ thống từ chối khởi động dịch vụ (\texttt{Fail-Closed}).
+\end{enumerate}
+
+\subsection{Động cơ truy hồi kép và Bộ hợp nhất RRF (Dual Retrieval Engine \& RRF Combiner)}
+
+Thiết kế truy hồi kép kết hợp khớp từ khóa và biểu diễn ngữ nghĩa. Nguyên lý đã trình bày tại Mục~\ref{sec:theory_hybrid_rag}; các thành phần triển khai gồm:
+\begin{enumerate}[nosep]
+  \item \textbf{Động cơ truy hồi từ khóa \texttt{BM25Retriever}}:
+  \begin{itemize}[nosep]
+    \item Chỉ mục ngược lưu trên RAM. Độ trễ phụ thuộc corpus và môi trường; kết quả đo ngoại tuyến được trình bày tại Chương~\ref{chap:results_evaluation}.
+    \item Chuẩn hóa từ vựng: chuyển chữ thường, bỏ dấu qua Unicode NFD, đổi \texttt{đ} thành \texttt{d} và loại từ dừng theo danh sách cấu hình. Đây là xử lý từ vựng, không phải hiểu ngữ nghĩa.
+    \item Lọc ngưỡng tối thiểu 50\% từ khóa: Câu truy vấn bắt buộc phải có độ giao thoa từ khóa với đoạn trích đạt ít nhất 50\% (\texttt{len(matched) / len(query\_terms) >= 0.5}) và các từ khóa này bắt buộc phải xuất hiện trong phần thân trích đoạn (\texttt{text}) chứ không chỉ dựa vào tiêu đề văn bản, loại bỏ các đoạn trích chỉ trùng tên tài liệu mà không liên quan đến nội dung hỏi.
+    \item Tính điểm theo thuật toán BM25 kinh điển với hệ số điều chỉnh $k_1 = 1{,}2$ và $b = 0{,}75$, trả về Top-5 đoạn trích phù hợp nhất.
+  \end{itemize}
+  \item \textbf{Động cơ truy hồi ngữ nghĩa dày đặc \texttt{LocalOnnxEmbeddings}}:
+  \begin{itemize}[nosep]
+    \item Mô hình nhúng ONNX CPU được dùng trong thí nghiệm ngoại tuyến. Không có gọi API embedding từ xa trong cấu hình này; vẫn tồn tại chi phí nạp model, tính toán và bộ nhớ cần đo.
+    \item Sử dụng cặp tiền tố bất đối xứng đặc thù: Thêm tiền tố \texttt{query: } cho câu hỏi người dùng và \texttt{passage: } cho các đoạn văn bản tài liệu, tương thích với kiến trúc biểu diễn truy hồi bất đối xứng.
+    \item Tổng hợp vector bằng cơ chế Mean Pooling có mặt nạ chú ý (\texttt{attention\_mask\_mean}) và chuẩn hóa vector về chuẩn Euclid L2 ($\|\vec{v}\|_2 = 1$), tạo ra không gian vector nhúng ngữ nghĩa cô đọng 384 chiều:
+    \begin{equation}
+    \vec{v}_{\text{norm}} = \frac{\vec{v}}{\|\vec{v}\|_2}, \quad \text{với } \vec{v} = \frac{\sum_{i=1}^{L} \mathbf{h}_i \cdot m_i}{\sum_{i=1}^{L} m_i}
+    \end{equation}
+    \item Tính toán độ tương đồng Cosine thông qua tích vô hướng vector giữa câu truy vấn và các đoạn trích trong kho, trả về Top-5 đoạn trích có độ tương đồng ngữ nghĩa cao nhất.
+  \end{itemize}
+  \item \textbf{Bộ hợp nhất xếp hạng nghịch đảo (Reciprocal Rank Fusion -- RRF Combiner)}:
+  Tiếp nhận Top-5 đoạn trích từ BM25 và Top-5 đoạn trích từ ONNX, nhóm áp dụng thuật toán kết hợp RRF với tham số làm mịn kinh điển $k = 60$:
+  \begin{equation}
+  \label{eq:rrf_score}
+  RRF(d) = \sum_{m \in \{\text{BM25}, \text{ONNX}\}} \frac{1}{60 + r_m(d)}
+  \end{equation}
+  Trong đó $r_m(d)$ là thứ hạng từ 1 đến 5 ở nhánh $m$; đoạn vắng mặt không đóng góp điểm. Bộ hợp nhất chọn Top-5 theo điểm giảm dần để đưa qua kiểm tra bằng chứng.
+\end{enumerate}
+
+\subsection{Cổng kiểm chứng bằng chứng và Đối chiếu ảnh chụp kép (Evidence Gate \& Double Snapshot)}
+
+Trước khi đưa các đoạn trích vào ngữ cảnh tổng hợp câu trả lời, hệ thống thiết lập hai lớp kiểm soát an toàn nghiêm ngặt:
+\begin{enumerate}[nosep]
+  \item \textbf{Cổng kiểm chứng Evidence Gate (\texttt{classify})}: Mỗi đoạn trích trong Top-5 RRF được thẩm định độc lập qua 4 điều kiện tuần tự:
+  \begin{itemize}[nosep]
+    \item \textit{Chặn Prompt Injection}: Quét biểu thức chính quy \texttt{\_INJECTION} phát hiện các mẫu tấn công phá rào như \texttt{ignore previous instructions}, \texttt{<|im\_start|>}, \texttt{[INST]}, \texttt{bỏ qua hướng dẫn hệ thống} $\rightarrow$ Phán quyết \texttt{DROPPED}.
+    \item \textit{Phát hiện mâu thuẫn tiên đề (\texttt{\_contradicts\_premise})}: Đối chiếu trực diện các khẳng định mang tính phổ quát đối lập giữa câu hỏi và văn bản (ví dụ câu hỏi quả quyết \textit{``mọi vé đều được hoàn tiền''} trong khi chính sách nêu rõ \textit{``không bao giờ hoàn tiền''}) $\rightarrow$ Phán quyết \texttt{CONFLICTS}, đánh dấu nhãn cảnh báo \texttt{[BẰNG CHỨNG PHẢN BIỆN — cần đối chiếu]} trong văn bản trích dẫn.
+    \item \textit{Lọc liên quan thực chất (\texttt{\_relevance\_ratio})}: Đòi hỏi tỷ lệ từ khóa của câu hỏi xuất hiện trong ngữ cảnh đoạn trích phải đạt từ 50\% trở lên $\rightarrow$ Nếu dưới 50\%, phán quyết \texttt{DROPPED}.
+    \item \textit{Kiểm tra rỗng}: Nội dung trích đoạn rỗng hoặc không có giá trị $\rightarrow$ Phán quyết \texttt{DROPPED}.
+  \end{itemize}
+  Đoạn trích hợp lệ được giữ hoặc đánh dấu cần đối chiếu. Nếu bộ thẩm định lỗi hay thiếu phán quyết, use case mặc định \texttt{DROPPED}; không có cơ chế tự coi toàn bộ kết quả là \texttt{KEPT}.
+  \item \textbf{Cơ chế kiểm chứng ảnh chụp kép (Double Snapshot Verification)}:
+  Để phòng chống lỗ hổng kiểm tra trước khi dùng (Time-of-Check to Time-of-Use -- TOCTOU) xảy ra khi tài liệu chính sách bị cập nhật hoặc thu hồi trong tích tắc giữa thời điểm truy hồi và thời điểm mô hình sinh câu trả lời:
+  \begin{itemize}[nosep]
+    \item Tại thời điểm bắt đầu xử lý $t_0$, hệ thống chụp snapshot tri thức hiện hành: $S_0 = \texttt{store.snapshot}(t_0)$.
+    \item Sau khi hoàn tất truy hồi và kiểm chứng, tại thời điểm $t_1$ ngay trước khi tổng hợp, hệ thống chụp snapshot thứ hai: $S_1 = \texttt{store.snapshot}(t_1)$.
+    \item Kiểm tra tính bất biến: $S_1.\texttt{release\_id} == S_0.\texttt{release\_id}$ và $S_1.\texttt{catalog\_sha256} == S_0.\texttt{catalog\_sha256}$. Đồng thời đối chiếu từng đoạn trích đã chọn vẫn còn nằm trong danh sách các đoạn trích hợp lệ (\texttt{fresh}) tại thời điểm $t_1$.
+    \item Nếu phát hiện bất kỳ sự thay đổi thẩm quyền tri thức nào diễn ra giữa chừng, hệ thống lập tức ngắt phiên và ném ngoại lệ \texttt{KnowledgeError("Knowledge authority changed during retrieval")}.
+  \end{itemize}
+\end{enumerate}
+
+\subsection{Bộ tổng hợp câu trả lời và dự phòng trích xuất (Policy Synthesis \& Fallback)}
+
+Tại chặng cuối của phân hệ RAG, các đoạn trích vượt qua cổng kiểm chứng được chuyển tới bộ tổng hợp câu trả lời \texttt{PolicySynthesizer}:
+\begin{itemize}[nosep]
+  \item \textbf{Giao diện \texttt{PolicySynthesizer} và hai hiện thực kỹ thuật}:
+  \begin{itemize}[nosep]
+    \item \texttt{OllamaPolicySynthesizer}: adapter tùy chọn gọi máy chủ mô hình qua POST nội bộ \texttt{/api/chat}. Đây không phải tool nghiệp vụ. \texttt{temperature=0.0} giảm tính ngẫu nhiên nhưng không bảo đảm suy luận đúng.
+    \item \texttt{PeftPolicySynthesizer}: Hiện thực nhúng trực tiếp trong tiến trình GPU phục vụ đánh giá chuẩn ngoại tuyến, nạp mô hình nền \texttt{Qwen/Qwen2.5-3B-Instruct} kết hợp bộ thích ứng LoRA (PEFT Adapter) được lượng tử hóa 4-bit NF4 (\texttt{BitsAndBytesConfig}, \texttt{load\_in\_4bit=True}, \texttt{bnb\_4bit\_quant\_type="nf4"}, \texttt{bnb\_4bit\_use\_double\_quant=True}), giới hạn độ dài sinh \texttt{max\_new\_tokens = 300} và \texttt{temperature = 0.0}.
+  \end{itemize}
+  \item \textbf{Dự phòng trích xuất (Extractive Fallback)}:
+  Khi sinh thất bại hoặc không vượt kiểm tra câu trả lời, use case có thể dùng nguyên đoạn bằng chứng hợp lệ kèm citation. Nguồn phải còn hiệu lực sau bước kiểm tra lại. Nếu không đủ bằng chứng thì trả thiếu nguồn; fallback không chứng minh uptime 100\% và không phải cơ chế circuit breaker có trạng thái mở/đóng đã được đo.
+\end{itemize}
+
+\section{Thiết kế phân hệ Web BFF và Cơ chế Bảo mật Dịch vụ AI}
+\label{sec:ai_service_design}
+
+\subsection{Cơ chế bảo mật Cookie \texttt{HttpOnly} tại lớp BFF (\texttt{smartevent-web})}
+
+Web có BFF tại \nolinkurl{/api/auth/*} cho phiên đăng nhập và \nolinkurl{/api/chat} cho hội thoại trợ lý ảo. Cookie \texttt{HttpOnly} giúp hạn chế JavaScript đọc trực tiếp token; BFF xử lý chuyển tiếp phiên theo chính sách xác thực. Cơ chế này không tự loại bỏ XSS/CSRF, và cookie đăng nhập không phải quyền truy cập dữ liệu riêng tư dành cho AI. Luồng chatbot cần kiểm chứng ủy quyền riêng trước khi mở công cụ tài khoản.
+
+\subsection{Thiết kế 4 lớp bảo vệ \texttt{READ\_ONLY} và 14 công cụ đọc dữ liệu của \texttt{ai-service}}
+
+Các lớp kiểm soát có trách nhiệm khác nhau; không lớp nào là bằng chứng an toàn tổng quát:
+\begin{enumerate}[nosep]
+  \item \textbf{Static guard}: script \nolinkurl{scripts/verify/static_verify.py} phân tích AST để phát hiện một số phụ thuộc và lời gọi trái quy tắc kiến trúc. Nó không chứng minh mọi hành vi mạng ở thời gian chạy.
+  \item \textbf{Giao vận}: \texttt{SafeBackendTransport} giới hạn origin/path, GET, timeout, redirect và kích thước phản hồi (262.144 byte). Endpoint GET có tác dụng ghi không được vào registry.
+  \item \textbf{Gateway và projection}: kiểm tra gate, schema tham số, schema phản hồi và allowlist trường. Không đưa raw JSON, QR credential hoặc token vào ngữ cảnh mô hình; yêu cầu quyền công khai/self-only được xác minh ở backend.
+  \item \textbf{Kiểm tra đầu ra NLU}: parser kiểm tra enum, slot, kiểu và thao tác cập nhật trạng thái trước khi điều phối. \texttt{RuleBasedNLU} là baseline/fallback khi provider không hợp lệ, không phải cơ chế xác thực và không được dùng thay gate công cụ.
+\end{enumerate}
+
+Registry hiện có 14 công cụ GET với schema, projection và gate. Cả 14 mục đều có \texttt{enabled: false} trong cấu hình mặc định. Điều này không xác nhận endpoint đã được nghiệm thu; profile local cho tìm sự kiện công khai hoặc kho hướng dẫn phải được đánh giá riêng. Các công cụ tài khoản tiếp tục đóng khi chưa có bằng chứng ủy quyền self-only.
+
+\begingroup
+\footnotesize
+\begin{longtable}{|L{3.7cm}|L{6.4cm}|L{4.3cm}|}
+\caption{Danh mục 14 công cụ GET; khai báo không đồng nghĩa đã nghiệm thu}\label{tab:14_business_tools}\\
+\hline
+\rowcolor{tableheader}\textbf{Công cụ} & \textbf{Endpoint cố định} & \textbf{Phạm vi/gate} \\
+\hline
+\endfirsthead
+\hline
+\rowcolor{tableheader}\textbf{Công cụ} & \textbf{Endpoint cố định} & \textbf{Phạm vi/gate} \\
+\hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+\texttt{search\_\allowbreak events} & \nolinkurl{/api/v1/events} & Công khai; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak event\_\allowbreak details} & \nolinkurl{/api/v1/events/{id}} & Công khai; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak event\_\allowbreak areas} & \nolinkurl{/api/v1/events/{eventId}/areas} & Công khai; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak ticket\_\allowbreak types} & \nolinkurl{/api/v1/events/{eventId}/ticket-types} & Công khai; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak sale\_\allowbreak phases} & \nolinkurl{/api/v1/events/{eventId}/sale-phases} & Công khai; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak event\_\allowbreak inventory} & \nolinkurl{/api/v1/events/{eventId}/inventory} & Công khai; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak available\_\allowbreak seats} & \nolinkurl{/api/v1/areas/{areaId}/seats/available} & Công khai; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak active\_\allowbreak reservation} & \nolinkurl{/api/v1/reservations/active} & Cá nhân self-only; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak reservation} & \nolinkurl{/api/v1/reservations/{id}} & Cá nhân self-only; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak my\_\allowbreak orders} & \nolinkurl{/api/v1/orders/my-orders} & Cá nhân self-only; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak order} & \nolinkurl{/api/v1/orders/{id}} & Cá nhân self-only; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak payment\_\allowbreak status} & \nolinkurl{/api/v1/payments/{id}} & Cá nhân self-only; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak my\_\allowbreak tickets} & \nolinkurl{/api/v1/tickets/my-tickets} & Cá nhân self-only; mặc định tắt. \\
+\hline
+\texttt{get\_\allowbreak refund\_\allowbreak review} & \nolinkurl{/api/v1/orders/{orderId}/refund-review} & Cá nhân self-only; mặc định tắt. \\
+\hline
+\end{longtable}
+\endgroup
+
+\subsection{Ví dụ minh họa thuật toán xếp hạng vé theo ngân sách (\texttt{TicketOptimizer})}
+
+Tầng domain có hàm xếp hạng vé bằng \texttt{Decimal}; phép tính tách khỏi mô hình ngôn ngữ. Ví dụ dưới đây dùng dữ liệu giả định để giải thích thuật toán, không phải truy vấn tồn kho đã chạy. Luồng gọi \texttt{get\_ticket\_types} và điều hướng chỉ là thiết kế khi đạt gate, chưa kết nối thành khuyến nghị live. Kiểu số chính xác không bảo đảm giá và số lượng đầu vào luôn đúng.
+\begin{enumerate}[nosep]
+  \item Mô hình NLU 1.5B bóc tách được \texttt{primary\_intent = "TICKET\_RECOMMEND"}, \texttt{quantity = 2}, \texttt{budget\_amount = 1500000}, \texttt{budget\_scope = "TOTAL"}.
+  \item Hệ thống gọi công cụ nghiệp vụ \texttt{get\_ticket\_types} lấy danh sách các hạng vé hiện có của sự kiện từ Backend, giả sử gồm 4 hạng vé:
+  \begin{itemize}[nosep]
+    \item \texttt{Early Bird Standard}: đơn giá $450.000\text{ VNĐ}$, tồn kho $a_1 = 0$ (đã hết vé).
+    \item \texttt{Standard GA}: đơn giá $500.000\text{ VNĐ}$, tồn kho $a_2 = 45$ vé $\rightarrow$ tổng tiền 2 vé là $1.000.000\text{ VNĐ}$ (dư $500.000\text{ VNĐ}$).
+    \item \texttt{Fan Zone}: đơn giá $700.000\text{ VNĐ}$, tồn kho $a_3 = 18$ vé $\rightarrow$ tổng tiền 2 vé là $1.400.000\text{ VNĐ}$ (dư $100.000\text{ VNĐ}$).
+    \item \texttt{VIP Lounge}: đơn giá $1.200.000\text{ VNĐ}$, tồn kho $a_4 = 10$ vé $\rightarrow$ tổng tiền 2 vé là $2.400.000\text{ VNĐ}$ (vượt ngân sách).
+  \end{itemize}
+  \item Hàm \texttt{recommend()} trong \texttt{recommendation.py} lập tức loại bỏ \texttt{Early Bird Standard} (vì $a_1 < 2$) và \texttt{VIP Lounge} (vì $2.400.000 > 1.500.000$), sau đó xếp hạng \texttt{Standard GA} ở vị trí số 1 (đơn giá thấp nhất trong các lựa chọn khả thi) và \texttt{Fan Zone} ở vị trí số 2 (phương án nâng cao sát ngân sách), theo thứ tự giá tăng dần của thuật toán (\texttt{t.price, t.id}); kết quả phụ thuộc dữ liệu đầu vào và không giữ chỗ cho khách hàng.
+\end{enumerate}
+
+\section{Thiết kế bộ nhãn hội thoại Ontology v1.2 (21 Intents và 19 Actions)}
+\label{sec:dialogue_ontology}
+
+Đặc tả lịch sử Ontology v1.2 mô tả 21 ý định và 19 hành động mục tiêu (\texttt{proposed\_actions}). Bảng~\ref{tab:ontology_21_intents} trình bày ánh xạ 21 ý định sang các hành động tra cứu chính; ngoài ra, tập 19 hành động còn chứa các hành động thực thi an toàn và ranh giới bảo mật như \texttt{REQUEST\_LOGIN} (yêu cầu đăng nhập khi truy cập thông tin cá nhân) và \texttt{EXPLAIN\_WRITE\_LIMITATION} (giải thích giới hạn khi người dùng yêu cầu thao tác ghi). Một số nhãn chỉ thuộc tập dữ liệu/tham chiếu và chưa được runtime chấp nhận. Không thực thi trực tiếp nhãn do model đề xuất.
+
+\begingroup
+\footnotesize
+\renewcommand{\arraystretch}{1.08}
+\begin{longtable}{|L{3.9cm}|L{4.4cm}|p{6.2cm}|}
+\caption{Bảng thiết kế 21 Intents và ánh xạ Proposed Actions trong Ontology v1.2} \label{tab:ontology_21_intents} \\
+\hline
+\rowcolor{tableheader}
+\textbf{Ý định (\texttt{primary\_intent})} & \textbf{Hành động (\texttt{proposed\_action})} & \textbf{Ý nghĩa xử lý trong cuộc trò chuyện} \\
+\hline
+\endfirsthead
+\hline
+\rowcolor{tableheader}
+\textbf{Ý định (\texttt{primary\_intent})} & \textbf{Hành động (\texttt{proposed\_action})} & \textbf{Ý nghĩa xử lý trong cuộc trò chuyện} \\
+\hline
+\endhead
+\hline
+\endfoot
+\hline
+\endlastfoot
+\rowcolor{gray!10}\multicolumn{3}{|l|}{\textbf{Nhóm 1: Chào hỏi, điều hướng và hỏi làm rõ (General -- 3 Intents)}} \\
+\hline
+\texttt{GREETING} & \texttt{ANSWER\_GREETING} & Chào hỏi người dùng và giới thiệu năng lực trợ lý ảo. \\
+\hline
+\texttt{OUT\_OF\_SCOPE} & \texttt{REFUSE\_}\allowbreak\texttt{UNSUPPORTED\_}\allowbreak\texttt{ACTION} & Từ chối lịch sự các câu hỏi ngoài phạm vi hỗ trợ của hệ thống. \\
+\hline
+\texttt{CLARIFY} & \texttt{ASK\_CLARIFICATION} & Hỏi lại người dùng khi câu hỏi còn mơ hồ hoặc thiếu tiêu chí lọc. \\
+\hline
+\rowcolor{gray!10}\multicolumn{3}{|l|}{\textbf{Nhóm 2: Tra cứu và đối sánh sự kiện (Event -- 3 Intents)}} \\
+\hline
+\texttt{SEARCH\_EVENT} & \texttt{SEARCH\_EVENTS} & Tìm kiếm sự kiện theo thành phố, thể loại hoặc ngày biểu diễn. \\
+\hline
+\texttt{EVENT\_DETAIL} & \texttt{GET\_EVENT\_DETAILS} & Xem thông tin chi tiết, lịch diễn và địa điểm của sự kiện. \\
+\hline
+\texttt{EVENT\_COMPARE} & \texttt{GET\_EVENT\_DETAILS} & Đối sánh lịch diễn, giá vé hoặc quy mô giữa hai sự kiện. \\
+\hline
+\rowcolor{gray!10}\multicolumn{3}{|l|}{\textbf{Nhóm 3: Giá vé, tồn kho và gợi ý tối ưu (Ticket -- 5 Intents)}} \\
+\hline
+\texttt{TICKET\_PRICE} & \texttt{GET\_TICKET\_OPTIONS} & Tra cứu bảng giá niêm yết các hạng vé của sự kiện. \\
+\hline
+\texttt{TICKET\_AVAILABILITY} & \texttt{CHECK\_INVENTORY} & Kiểm tra số lượng vé còn mở bán của từng hạng vé. \\
+\hline
+\texttt{SEAT\_AVAILABILITY} & \texttt{CHECK\_SEATS} & Kiểm tra vị trí ghế còn trống trên sơ đồ khán đài. \\
+\hline
+\texttt{TICKET\_RECOMMEND} & \texttt{RUN\_TICKET\_OPTIMIZER} & Chạy thuật toán gợi ý phương án vé tối ưu theo ngân sách và số người. \\
+\hline
+\texttt{TICKET\_ALTERNATIVE} & \texttt{RUN\_TICKET\_OPTIMIZER} & Đề xuất phương án vé thay thế khi hạng vé mong muốn đã hết chỗ. \\
+\hline
+\rowcolor{gray!10}\multicolumn{3}{|l|}{\textbf{Nhóm 4: Hướng dẫn đặt vé và giữ chỗ (Booking -- 3 Intents)}} \\
+\hline
+\texttt{BOOKING\_GUIDANCE} & \texttt{NAVIGATE\_TO\_BOOKING} & Hướng dẫn các bước tự thao tác đặt giữ chỗ trên trang web. \\
+\hline
+\texttt{RESERVATION\_STATUS} & \texttt{GET\_RESERVATION} & Tra cứu thời gian giữ chỗ còn lại của phiên đặt vé hiện tại. \\
+\hline
+\texttt{CHECKOUT\_HANDOFF} & \texttt{NAVIGATE\_TO\_BOOKING} & Điều hướng người dùng sang giao diện thanh toán an toàn. \\
+\hline
+\rowcolor{gray!10}\multicolumn{3}{|l|}{\textbf{Nhóm 5: Đơn hàng, thanh toán và vé đã mua (Account -- 3 Intents)}} \\
+\hline
+\texttt{ORDER\_STATUS} & \texttt{GET\_MY\_ORDERS} & Tra cứu danh sách và trạng thái đơn hàng của người dùng. \\
+\hline
+\texttt{PAYMENT\_STATUS} & \texttt{GET\_PAYMENT\_STATUS} & Kiểm tra tình trạng xác nhận giao dịch từ cổng thanh toán. \\
+\hline
+\texttt{MY\_TICKETS} & \texttt{GET\_MY\_TICKETS} & Tra cứu danh sách vé đã mua của tài khoản (không lộ mã QR). \\
+\hline
+\rowcolor{gray!10}\multicolumn{3}{|l|}{\textbf{Nhóm 6: Chính sách quy chế và hỗ trợ (Support -- 4 Intents)}} \\
+\hline
+\texttt{REFUND\_POLICY} & \texttt{RETRIEVE\_POLICY} & Tra cứu quy định hoàn hủy vé từ kho văn bản chính sách RAG. \\
+\hline
+\texttt{REFUND\_SUPPORT} & \texttt{GET\_REFUND\_REVIEW} & Kiểm tra tiến độ giải quyết yêu cầu hoàn tiền của đơn hàng. \\
+\hline
+\texttt{TICKET\_}\allowbreak\texttt{TRANSFER\_}\allowbreak\texttt{HELP} & \texttt{RETRIEVE\_POLICY} & Giải thích quy định và hướng dẫn thủ tục chuyển nhượng vé. \\
+\hline
+\texttt{HUMAN\_HANDOFF} & \texttt{SHOW\_SUPPORT\_CHANNEL} & Cung cấp kênh liên hệ hỗ trợ từ nhân viên chăm sóc khách hàng. \\
+\hline
+\end{longtable}
+\endgroup
+
+Về mặt kiến trúc cài đặt, nhóm thiết kế cơ chế phân tách giữa đặc tả ngữ nghĩa toàn diện và máy trạng thái thực thi thời gian chạy:
+\begin{itemize}[nosep]
+  \item \textbf{Đặc tả Ontology v1.2 toàn diện (21 Intents \& 19 Actions)}: Được chuẩn hóa trong tệp \nolinkurl{docs/contexts/v1.2/configs/dialogue_ontology.yaml}, đóng vai trò là không gian nhãn mục tiêu bao phủ toàn bộ bài toán nghiệp vụ bán vé. Bộ nhãn này được sử dụng trực tiếp để định hình tập dữ liệu huấn luyện và giúp mô hình Qwen2.5-1.5B học được cách trích xuất đa dạng ngữ cảnh.
+  \item \textbf{Hợp đồng runtime hiện hành}: enum \texttt{Intent} trong \texttt{domain/dialogue.py} có 14 giá trị, gồm \texttt{PUBLIC\_HELP}, \texttt{POLICY\_FAQ}, \texttt{REFUND\_POLICY} và các ý định tra cứu cốt lõi. Parser kiểm tra enum, slot và state delta; không giả định mọi nhãn trong bảng lịch sử có ánh xạ an toàn. Nhãn không được hỗ trợ phải bị từ chối hoặc xử lý theo luồng fallback được cài đặt và kiểm thử rõ ràng.
+\end{itemize}

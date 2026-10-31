@@ -1,0 +1,139 @@
+% ==============================================================================
+% config.tex - Thiet lap thong so trang, font chu, tieu de, header/footer
+% ==============================================================================
+
+% --- Can le chuan bao cao sinh vien ---
+\geometry{
+  a4paper,
+  top=2.2cm,
+  bottom=2.2cm,
+  left=3.0cm,
+  right=2.0cm,
+  headheight=18pt
+}
+
+% --- Gian dong va khoang cach doan ---
+\setstretch{1.20}
+\setlength{\parskip}{3pt}
+\setlength{\parindent}{1.2em}
+\raggedbottom
+
+% --- Cau hinh phan bo float tranh don trang tao khoang trang lon ---
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\bottomfraction}{0.85}
+\renewcommand{\textfraction}{0.15}
+\renewcommand{\floatpagefraction}{0.8}
+
+% --- Chong tran chu le phai ---
+\tolerance=1500
+\emergencystretch=3.5em
+\hbadness=10000
+
+% --- Dinh dang duong ke bang ---
+\setlength{\arrayrulewidth}{0.55pt}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.22}
+
+% --- Dinh dang Tieu de Chuong / Muc ---
+\titleformat{\chapter}[display]
+  {\normalfont\Large\bfseries\color{black}}
+  {\chaptertitlename\ \thechapter}{6pt}{\LARGE}
+\titlespacing*{\chapter}{0pt}{-18pt}{12pt}
+
+\titleformat{name=\chapter,numberless}[display]
+  {\normalfont\Large\bfseries\color{black}}
+  {}{0pt}{\LARGE}
+\titlespacing*{name=\chapter,numberless}{0pt}{-18pt}{12pt}
+
+\titleformat{\section}
+  {\normalfont\large\bfseries\color{black}}
+  {\thesection}{0.8em}{}
+\titlespacing*{\section}{0pt}{10pt}{4pt}
+
+\titleformat{\subsection}
+  {\normalfont\normalsize\bfseries\color{black}}
+  {\thesubsection}{0.8em}{}
+\titlespacing*{\subsection}{0pt}{8pt}{3pt}
+
+\titleformat{\subsubsection}
+  {\normalfont\normalsize\itshape\bfseries\color{black}}
+  {\thesubsubsection}{0.8em}{}
+\titlespacing*{\subsubsection}{0pt}{6pt}{2pt}
+
+% --- Header & Footer ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize\textit{AI Course $\mid$ Capstone Project Final Report}}
+\fancyhead[R]{\footnotesize\textbf{Samsung Innovation Campus}}
+\fancyfoot[L]{\scriptsize\copyright\ Samsung Electronics. All rights reserved.}
+\fancyfoot[R]{\footnotesize Trang \thepage\ / \pageref*{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+\fancypagestyle{frontmatterstyle}{
+  \fancyhf{}
+  \fancyhead[L]{\footnotesize\textit{AI Course $\mid$ Capstone Project Final Report}}
+  \fancyhead[R]{\footnotesize\textbf{Samsung Innovation Campus}}
+  \fancyfoot[L]{\scriptsize\copyright\ Samsung Electronics. All rights reserved.}
+  \fancyfoot[R]{\footnotesize Trang \thepage}
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+}
+
+\fancypagestyle{plain}{
+  \fancyhf{}
+  \fancyhead[L]{\footnotesize\textit{AI Course $\mid$ Capstone Project Final Report}}
+  \fancyhead[R]{\footnotesize\textbf{Samsung Innovation Campus}}
+  \fancyfoot[L]{\scriptsize\copyright\ Samsung Electronics. All rights reserved.}
+  \fancyfoot[R]{\footnotesize Trang \thepage\ / \pageref*{LastPage}}
+  \renewcommand{\headrulewidth}{0.4pt}
+  \renewcommand{\footrulewidth}{0.4pt}
+}
+
+% --- Cau hinh ma nguon (listings style studentcode) ---
+\lstdefinestyle{studentcode}{
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeborder},
+  framesep=4pt,
+  basicstyle=\ttfamily\footnotesize\color{black},
+  keywordstyle=\bfseries\color{black},
+  commentstyle=\itshape\color{black!65},
+  stringstyle=\color{black},
+  numberstyle=\tiny\color{black!55},
+  numbers=left,
+  numbersep=6pt,
+  breaklines=true,
+  breakatwhitespace=false,
+  tabsize=2,
+  showstringspaces=false,
+  captionpos=b,
+  escapeinside={(*@}{@*)}
+}
+\lstset{style=studentcode}
+
+% --- Khung hop JSON / Ket qua test (tcolorbox databox) ---
+\newtcolorbox{databox}[1]{
+  enhanced,
+  breakable,
+  colback=codebg,
+  colframe=black!60,
+  coltitle=black,
+  colbacktitle=tableheader,
+  fonttitle=\bfseries\small,
+  title={#1},
+  arc=1mm,
+  boxrule=0.5pt,
+  left=6pt, right=6pt, top=4pt, bottom=4pt
+}
+
+% --- Thiet lap lien ket PDF (Hyperref) ---
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=black,
+  plainpages=false,
+  pdftitle={Bao cao Do an Tot nghiep SIC - SmartEvent AI},
+  pdfauthor={Nhom Sinh vien SmartEvent}
+}
